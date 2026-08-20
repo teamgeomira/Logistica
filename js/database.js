@@ -1,4 +1,4 @@
-// Funciones globales de base de datos
+// Funciones globales de base de datos - SIN IMPORTS/EXPORTS
 window.subscribeToEntity = function(entity, callback) {
   const entityRef = window.db.ref(entity);
   return entityRef.on('value', (snapshot) => {
@@ -37,18 +37,22 @@ window.softDeleteRecord = async function(entity, id, userId) {
 };
 
 window.writeAudit = async function(action, entity, entityId, description, userId, userName) {
-  const auditRef = window.db.ref('auditLogs');
-  const newAudit = auditRef.push();
-  await newAudit.set({
-    id: newAudit.key,
-    userId,
-    userName,
-    action,
-    entity,
-    entityId,
-    description,
-    timestamp: firebase.database.ServerValue.TIMESTAMP
-  });
+  try {
+    const auditRef = window.db.ref('auditLogs');
+    const newAudit = auditRef.push();
+    await newAudit.set({
+      id: newAudit.key,
+      userId,
+      userName: userName || 'Usuario',
+      action,
+      entity,
+      entityId,
+      description,
+      timestamp: firebase.database.ServerValue.TIMESTAMP
+    });
+  } catch (error) {
+    console.warn('Error al escribir auditoría:', error);
+  }
 };
 
 window.onConnectionChange = function(callback) {

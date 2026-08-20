@@ -1,4 +1,4 @@
-// Utilidades globales
+// Utilidades globales - SIN IMPORTS/EXPORTS
 window.formatMoney = function(amount, currency = window.APP_CONFIG.currency) {
   return new Intl.NumberFormat('es-ES', {
     style: 'currency',
@@ -38,4 +38,10 @@ window.debounce = function(fn, delay = 300) {
     clearTimeout(timer);
     timer = setTimeout(() => fn(...args), delay);
   };
+};
+
+window.getUserName = function(userId) {
+  if (!state || !state.data || !state.data.users) return userId;
+  const user = state.data.users[userId];
+  return user ? (user.name || user.email || userId) : userId;
 };

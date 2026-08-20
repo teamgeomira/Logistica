@@ -2,13 +2,15 @@ const CACHE_NAME = 'malanga-v1';
 const urlsToCache = [
   './',
   './index.html',
-  './styles.css',
-  './js/app.js',
+  './js/config.js',
   './js/firebase.js',
   './js/auth.js',
   './js/database.js',
   './js/utils.js',
-  './js/config.js'
+  './js/app.js',
+  'https://www.gstatic.com/firebasejs/10.12.1/firebase-app-compat.js',
+  'https://www.gstatic.com/firebasejs/10.12.1/firebase-auth-compat.js',
+  'https://www.gstatic.com/firebasejs/10.12.1/firebase-database-compat.js'
 ];
 
 self.addEventListener('install', (event) => {
@@ -32,7 +34,10 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
-      return fetch(event.request).catch(() => cached);
+      return fetch(event.request).catch(() => {
+        // Si falla y no hay caché, mostrar página offline
+        return caches.match('./index.html');
+      });
     })
   );
 });
