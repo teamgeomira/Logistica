@@ -1,0 +1,133 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "users": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
+      "$uid": {
+        ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        "role": {
+          ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'ADMIN'"
+        },
+        "active": {
+          ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'ADMIN'"
+        },
+        "createdAt": {
+          ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'ADMIN'"
+        }
+      }
+    },
+
+    "projects": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'ADMIN'"
+    },
+
+    "lands": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      "$landId": {
+        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+      }
+    },
+
+    "expenses": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      "$expenseId": {
+        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+      }
+    },
+
+    "contributions": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      "$contributionId": {
+        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+      }
+    },
+
+    "workers": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      "$workerId": {
+        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+      }
+    },
+
+    "workLogs": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      "$workLogId": {
+        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+      }
+    },
+
+    "seeds": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      "$seedId": {
+        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+      }
+    },
+
+    "agriculturalProducts": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      "$productId": {
+        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+      }
+    },
+
+    "cropActivities": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      "$activityId": {
+        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+      }
+    },
+
+    "incidents": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      "$incidentId": {
+        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+      }
+    },
+
+    "harvests": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      "$harvestId": {
+        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+      }
+    },
+
+    "sales": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      "$saleId": {
+        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+      }
+    },
+
+    "journal": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      "$entryId": {
+        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+      }
+    },
+
+    "attachments": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (!data.exists() && newData.exists() && newData.child('uploadedBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('uploadedBy').val() === auth.uid))"
+    },
+
+    "auditLogs": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (!data.exists() && newData.exists() && newData.child('userId').val() === auth.uid))"
+    }
+  }
+}

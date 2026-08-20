@@ -1,0 +1,23 @@
+{
+  "name": "Malanga - Gestión Agrícola",
+  "short_name": "Malanga",
+  "description": "Aplicación colaborativa para proyecto agrícola de malanga",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f8f9fa",
+  "theme_color": "#2d6a4f",
+  "icons": [
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
