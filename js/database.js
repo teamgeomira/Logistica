@@ -6,7 +6,7 @@ import {
   set,
   update,
   serverTimestamp
-} from 'firebase/database';
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 export function subscribeToEntity(entity, callback) {
   const entityRef = ref(db, entity);

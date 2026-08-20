@@ -4,8 +4,8 @@ import {
   signOut,
   sendPasswordResetEmail,
   onAuthStateChanged
-} from 'firebase/auth';
-import { ref, get } from 'firebase/database';
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { ref, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 export async function login(email, password) {
   return signInWithEmailAndPassword(auth, email, password);

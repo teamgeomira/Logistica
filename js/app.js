@@ -267,7 +267,6 @@ function renderList(entity) {
     .filter(r => !r.deleted)
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
-  const canCreate = true;
   let html = `
     <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
       <h2>${config.icon} ${config.label}</h2>
@@ -472,11 +471,12 @@ function showForm(entity, record = null) {
   modal.querySelector('.modal-close').addEventListener('click', closeModal);
 }
 
-function buildFormFields(entity, record = {}) {
+function buildFormFields(entity, record = null) {
   const config = ENTITY_CONFIG[entity];
+  const recordData = record || {}; // <-- Corrección clave
   let html = '';
   config.fields.forEach(field => {
-    const value = record[field.name] ?? (field.type === 'date' ? todayISO() : '');
+    const value = recordData[field.name] ?? (field.type === 'date' ? todayISO() : '');
     html += `<div class="form-group"><label for="f_${field.name}">${field.label}</label>`;
     switch (field.type) {
       case 'textarea':

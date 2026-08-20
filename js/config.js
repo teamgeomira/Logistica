@@ -1,4 +1,4 @@
-// Configuración pública de Firebase (sustituir por la de producción cuando corresponda)
+// Configuración pública de Firebase
 export const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBI4O0d_Mec38FDiuhirujCnX99PFKiXW4",
   authDomain: "projekt-pc.firebaseapp.com",
