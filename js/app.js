@@ -162,13 +162,6 @@ function renderNavigation() {
   });
   sidebar.innerHTML = sidebarHtml;
   bottomNav.innerHTML = bottomHtml;
-
-  // Ocultar usuarios si no es admin
-  if (state.userProfile?.role !== 'ADMIN') {
-    const usersLink = sidebar.querySelector('[data-section="mas"]');
-    // No se oculta, pero en Más solo se muestran attachments y auditLogs,
-    // y users solo se filtra en renderUsers
-  }
 }
 
 function renderCurrentView() {

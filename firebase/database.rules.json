@@ -1,133 +1,341 @@
 {
   "rules": {
-    ".read": false,
+    ".read": "auth != null",
     ".write": false,
-
-    "users": {
-      ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
-      "$uid": {
-        ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (auth.uid === $uid || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
-        "role": {
-          ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'ADMIN'"
-        },
-        "active": {
-          ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'ADMIN'"
-        },
-        "createdAt": {
-          ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'ADMIN'"
+    "chatRooms": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$chatId": {
+        ".read": "auth != null && (auth.uid === data.child('userId').val() || auth.token.email === 'vinicio@geomira.se')",
+        ".write": "auth != null && (auth.uid === data.child('userId').val() || auth.token.email === 'vinicio@geomira.se' || (!data.exists() && newData.child('userId').val() === auth.uid))",
+        "messages": {
+          ".read": "auth != null && (auth.uid === root.child('chatRooms').child($chatId).child('userId').val() || auth.token.email === 'vinicio@geomira.se')",
+          ".write": "auth != null && (auth.uid === root.child('chatRooms').child($chatId).child('userId').val() || auth.token.email === 'vinicio@geomira.se' || newData.child('senderId').val() === 'bot')",
+          "$messageId": {
+            ".validate": "newData.hasChildren(['text', 'senderId', 'timestamp', 'type']) && newData.child('text').val().length > 0 && newData.child('text').val().length <= 1000 && (newData.child('senderRole').val() === 'user' || newData.child('senderRole').val() === 'bot' || newData.child('senderRole').val() === 'admin')"
+          }
         }
       }
     },
-
+    "configuraciones": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.email === 'vinicio@geomira.se'"
+    },
+    "animales": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.email === 'vinicio@geomira.se'"
+    },
+    "eventos": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.email === 'vinicio@geomira.se'"
+    },
+    "ventas": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.email === 'vinicio@geomira.se'"
+    },
+    "clientes": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.email === 'vinicio@geomira.se'"
+    },
+    "contadores": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.email === 'vinicio@geomira.se'"
+    },
+    "users": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
+      "$userId": {
+        ".read": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' && root.child('users').child($userId).child('active').val() === true))",
+        ".write": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        "name": { ".write": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')" },
+        "email": { ".write": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')" },
+        "phone": { ".write": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')" },
+        "country": { ".write": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')" },
+        "role": { ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')" },
+        "active": { ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')" },
+        "balance": { ".write": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')" },
+        "totalDeposits": { ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (auth.uid !== $userId && root.child('transfers').hasChildren([auth.uid])))" },
+        "totalWithdrawals": { ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || auth.uid === $userId)" },
+        "totalEarnings": { ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')" },
+        "referralBonus": { ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')" },
+        "totalReferrals": { ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')" },
+        "kycStatus": { ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')" },
+        "cardCount": { ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')" },
+        "updatedAt": { ".write": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')" },
+        "createdAt": { ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')" }
+      }
+    },
+    "investments": {
+      "$userId": {
+        ".read": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        "$investmentId": {
+          ".write": "auth != null && ((auth.uid === $userId && (!data.exists() || data.child('status').val() === 'active')) || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+          ".validate": "newData.hasChildren(['amount', 'planType', 'status', 'createdAt']) && newData.child('amount').val() >= 100 && newData.child('amount').val() <= 100000 && newData.child('status').val().matches(/^(active|completed|cancelled)$/)"
+        }
+      }
+    },
+    "deposits": {
+      "$userId": {
+        ".read": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        "$depositId": {
+          ".write": "auth != null && ((auth.uid === $userId && (!data.exists() || data.child('status').val() === 'pending')) || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')"
+        }
+      }
+    },
+    "withdrawals": {
+      "$userId": {
+        ".read": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        "$withdrawalId": {
+          ".write": "auth != null && ((auth.uid === $userId && (!data.exists() || data.child('status').val() === 'pending')) || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')"
+        }
+      }
+    },
+    "card_requests": {
+      "$userId": {
+        ".read": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        "$requestId": {
+          ".write": "auth != null && ((auth.uid === $userId && (!data.exists() || data.child('status').val() === 'pending')) || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+          ".validate": "newData.hasChildren(['type', 'status', 'requestedAt']) && (newData.child('status').val() === 'pending' || newData.child('status').val() === 'approved' || newData.child('status').val() === 'rejected')"
+        }
+      }
+    },
+    "user_cards": {
+      "$userId": {
+        ".read": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        "$cardId": {
+          ".validate": "newData.hasChildren(['cardNumber', 'status', 'type']) && newData.child('cardNumber').val().length >= 16 && newData.child('status').val().matches(/^(active|pending|blocked|expired|cancelled)$/)"
+        }
+      }
+    },
+    "card_history": {
+      "$userId": {
+        ".read": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        "$historyId": {
+          ".write": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')"
+        }
+      }
+    },
+    "admin_pending_requests": {
+      ".read": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+      ".write": "auth != null",
+      "$requestId": {
+        ".read": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && ((!data.exists() && newData.exists()) || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".validate": "(!data.exists() && newData.exists()) ? (newData.hasChildren(['action', 'userId', 'timestamp', 'status']) && newData.child('status').val() === 'pending') : true"
+      }
+    },
+    "transactions": {
+      "$userId": {
+        ".read": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        "$transactionId": {
+          ".write": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (newData.child('type').val() === 'transfer_in' && auth.uid !== $userId))"
+        }
+      }
+    },
+    "transfers": {
+      "$userId": {
+        ".read": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        "$transferId": {
+          ".write": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (auth.uid !== $userId && newData.child('recipientId').val() === auth.uid))",
+          ".validate": "newData.hasChildren(['amount', 'recipientId', 'senderId', 'status', 'createdAt']) && newData.child('amount').val() > 0 && newData.child('amount').val() <= 5000 && newData.child('status').val().matches(/^(pending|completed|rejected)$/)"
+        }
+      }
+    },
+    "contacts": {
+      "$userId": {
+        ".read": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        "$contactId": {
+          ".write": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+          ".validate": "newData.hasChildren(['name', 'email', 'userId', 'type', 'createdAt']) && newData.child('userId').val() !== $userId"
+        }
+      }
+    },
+    "notifications": {
+      "$userId": {
+        ".read": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        "$notificationId": {
+          ".write": "auth != null && ((auth.uid === $userId && newData.child('read').val() === true) || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')"
+        }
+      }
+    },
+    "investment_history": {
+      "$userId": {
+        ".read": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')"
+      }
+    },
+    "user_payment_methods": {
+      "$userId": {
+        ".read": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')"
+      }
+    },
+    "kyc_verifications": {
+      "$userId": {
+        ".read": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')"
+      }
+    },
+    "user_documents": {
+      "$userId": {
+        ".read": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')"
+      }
+    },
+    "referrals": {
+      "$userId": {
+        ".read": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')"
+      }
+    },
+    "card_transactions": {
+      "$userId": {
+        ".read": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')"
+      }
+    },
+    "accounts": {
+      ".read": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+      ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')"
+    },
+    "admins": {
+      ".read": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+      ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')"
+    },
+    "clients": {
+      ".read": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+      ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')"
+    },
+    "credits": {
+      "$userId": {
+        ".read": "auth != null && (auth.uid === $userId || auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+        ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')"
+      }
+    },
+    "loans": {
+      ".read": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+      ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')"
+    },
+    "movements": {
+      ".read": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')",
+      ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')"
+    },
+    "settings": {
+      ".read": "auth != null",
+      ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')"
+    },
+    "userRoles": {
+      ".read": "auth != null",
+      ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')"
+    },
+    "test_permission": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
     "projects": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'ADMIN'"
+      ".write": "auth != null && (auth.token.email === 'vinicio@geomira.se' || root.child('users').child(auth.uid).child('role').val() === 'ADMIN')"
     },
-
     "lands": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || newData.child('createdBy').val() === auth.uid)",
       "$landId": {
-        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+        ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (!data.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === auth.uid))"
       }
     },
-
     "expenses": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || newData.child('createdBy').val() === auth.uid)",
       "$expenseId": {
-        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+        ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (!data.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === auth.uid))"
       }
     },
-
     "contributions": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || newData.child('createdBy').val() === auth.uid)",
       "$contributionId": {
-        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+        ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (!data.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === auth.uid))"
       }
     },
-
     "workers": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || newData.child('createdBy').val() === auth.uid)",
       "$workerId": {
-        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+        ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (!data.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === auth.uid))"
       }
     },
-
     "workLogs": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || newData.child('createdBy').val() === auth.uid)",
       "$workLogId": {
-        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+        ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (!data.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === auth.uid))"
       }
     },
-
     "seeds": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || newData.child('createdBy').val() === auth.uid)",
       "$seedId": {
-        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+        ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (!data.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === auth.uid))"
       }
     },
-
     "agriculturalProducts": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || newData.child('createdBy').val() === auth.uid)",
       "$productId": {
-        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+        ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (!data.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === auth.uid))"
       }
     },
-
     "cropActivities": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || newData.child('createdBy').val() === auth.uid)",
       "$activityId": {
-        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+        ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (!data.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === auth.uid))"
       }
     },
-
     "incidents": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || newData.child('createdBy').val() === auth.uid)",
       "$incidentId": {
-        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+        ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (!data.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === auth.uid))"
       }
     },
-
     "harvests": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || newData.child('createdBy').val() === auth.uid)",
       "$harvestId": {
-        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+        ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (!data.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === auth.uid))"
       }
     },
-
     "sales": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || newData.child('createdBy').val() === auth.uid)",
       "$saleId": {
-        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+        ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (!data.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === auth.uid))"
       }
     },
-
     "journal": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || ((!data.exists() && newData.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === data.child('createdBy').val() && newData.child('updatedBy').val() === auth.uid)))",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || newData.child('createdBy').val() === auth.uid)",
       "$entryId": {
-        ".validate": "newData.hasChildren(['createdBy','updatedBy','createdAt','updatedAt','projectId'])"
+        ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (!data.exists() && newData.child('createdBy').val() === auth.uid) || (data.exists() && data.child('createdBy').val() === auth.uid && newData.child('createdBy').val() === auth.uid))"
       }
     },
-
     "attachments": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (!data.exists() && newData.exists() && newData.child('uploadedBy').val() === auth.uid) || (data.exists() && newData.exists() && data.child('uploadedBy').val() === auth.uid))"
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || newData.child('uploadedBy').val() === auth.uid)"
     },
-
     "auditLogs": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('active').val() === true",
-      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || (!data.exists() && newData.exists() && newData.child('userId').val() === auth.uid))"
+      ".write": "auth != null && root.child('users').child(auth.uid).child('active').val() === true && (root.child('users').child(auth.uid).child('role').val() === 'ADMIN' || newData.child('userId').val() === auth.uid)"
     }
   }
 }

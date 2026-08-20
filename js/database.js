@@ -1,5 +1,12 @@
 import { db } from './firebase.js';
-import { ref, onValue, push, set, update, serverTimestamp } from 'firebase/database';
+import {
+  ref,
+  onValue,
+  push,
+  set,
+  update,
+  serverTimestamp
+} from 'firebase/database';
 
 export function subscribeToEntity(entity, callback) {
   const entityRef = ref(db, entity);
@@ -11,12 +18,11 @@ export function subscribeToEntity(entity, callback) {
 export async function createRecord(entity, data) {
   const listRef = ref(db, entity);
   const newRef = push(listRef);
-  const timestamp = serverTimestamp();
   const record = {
     ...data,
     id: newRef.key,
-    createdAt: timestamp,
-    updatedAt: timestamp
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
   };
   await set(newRef, record);
   return newRef.key;
@@ -24,19 +30,17 @@ export async function createRecord(entity, data) {
 
 export async function updateRecord(entity, id, data) {
   const recordRef = ref(db, `${entity}/${id}`);
-  const timestamp = serverTimestamp();
   await update(recordRef, {
     ...data,
-    updatedAt: timestamp
+    updatedAt: serverTimestamp()
   });
 }
 
 export async function softDeleteRecord(entity, id, userId) {
   const recordRef = ref(db, `${entity}/${id}`);
-  const timestamp = serverTimestamp();
   await update(recordRef, {
     deleted: true,
-    deletedAt: timestamp,
+    deletedAt: serverTimestamp(),
     deletedBy: userId
   });
 }
@@ -44,7 +48,6 @@ export async function softDeleteRecord(entity, id, userId) {
 export async function writeAudit(action, entity, entityId, description, userId, userName) {
   const auditRef = ref(db, 'auditLogs');
   const newAudit = push(auditRef);
-  const timestamp = serverTimestamp();
   await set(newAudit, {
     id: newAudit.key,
     userId,
@@ -53,7 +56,7 @@ export async function writeAudit(action, entity, entityId, description, userId, 
     entity,
     entityId,
     description,
-    timestamp
+    timestamp: serverTimestamp()
   });
 }
 
