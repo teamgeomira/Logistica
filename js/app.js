@@ -1,21 +1,4 @@
-import { auth } from './firebase.js';
-import { watchAuth, login, logout, resetPassword } from './auth.js';
-import {
-  subscribeToEntity,
-  createRecord,
-  updateRecord,
-  softDeleteRecord,
-  writeAudit,
-  onConnectionChange
-} from './database.js';
-import {
-  NAV_SECTIONS,
-  ENTITY_CONFIG,
-  APP_CONFIG,
-  CLOUDINARY_CONFIG
-} from './config.js';
-import { formatMoney, formatDate, formatDateTime, escapeHtml, todayISO } from './utils.js';
-
+// Aplicación principal (global)
 const state = {
   currentUser: null,
   userProfile: null,
@@ -34,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initUI() {
-  document.getElementById('login-form').addEventListener('submit', handleLogin);
+  document.getElementById('login-btn').addEventListener('click', handleLogin);
   document.getElementById('reset-password').addEventListener('click', handleResetPassword);
   document.getElementById('logout-btn').addEventListener('click', handleLogout);
   document.getElementById('fab').addEventListener('click', showQuickMenu);
@@ -45,12 +28,11 @@ function initUI() {
     if (e.target.id === 'quick-menu') closeQuickMenu();
   });
 
-  // Delegación de eventos para navegación y acciones
   document.addEventListener('click', handleGlobalClick);
 }
 
 function initAuth() {
-  watchAuth((user, profile) => {
+  window.watchAuth((user, profile) => {
     if (user && profile) {
       state.currentUser = user;
       state.userProfile = profile;
@@ -65,7 +47,7 @@ function initAuth() {
 }
 
 function initConnectionStatus() {
-  onConnectionChange((online) => {
+  window.onConnectionChange((online) => {
     state.online = online;
     updateConnectionStatus();
   });
@@ -95,7 +77,7 @@ async function handleLogin(e) {
   const errorEl = document.getElementById('login-error');
   errorEl.textContent = '';
   try {
-    await login(email, password);
+    await window.login(email, password);
   } catch (err) {
     errorEl.textContent = 'Error al iniciar sesión. Verifica tus credenciales.';
   }
@@ -108,7 +90,7 @@ async function handleResetPassword() {
     return;
   }
   try {
-    await resetPassword(email);
+    await window.resetPassword(email);
     showToast('Correo de recuperación enviado.');
   } catch (err) {
     showToast('Error al enviar el correo de recuperación.');
@@ -117,7 +99,7 @@ async function handleResetPassword() {
 
 async function handleLogout() {
   try {
-    await logout();
+    await window.logout();
   } catch (err) {
     showToast('Error al cerrar sesión.');
   }
@@ -130,7 +112,7 @@ function subscribeToAllEntities() {
     'incidents', 'harvests', 'sales', 'journal', 'attachments', 'auditLogs'
   ];
   entities.forEach((entity) => {
-    const unsub = subscribeToEntity(entity, (data) => {
+    const unsub = window.subscribeToEntity(entity, (data) => {
       state.data[entity] = data;
       renderCurrentView();
     });
@@ -150,7 +132,7 @@ function renderNavigation() {
 
   let sidebarHtml = '';
   let bottomHtml = '';
-  NAV_SECTIONS.forEach((section) => {
+  window.NAV_SECTIONS.forEach((section) => {
     const active = state.currentSection === section.id ? 'active' : '';
     sidebarHtml += `<a href="#" class="${active}" data-section="${section.id}">
       <span>${section.icon}</span><span>${section.label}</span>
@@ -167,7 +149,7 @@ function renderNavigation() {
 function renderCurrentView() {
   const main = document.getElementById('main-content');
   if (!main) return;
-  const section = NAV_SECTIONS.find(s => s.id === state.currentSection) || NAV_SECTIONS[0];
+  const section = window.NAV_SECTIONS.find(s => s.id === state.currentSection) || window.NAV_SECTIONS[0];
   if (section.type === 'dashboard') {
     main.innerHTML = renderDashboard();
   } else if (section.type === 'list') {
@@ -194,10 +176,10 @@ function renderDashboard() {
     <div class="dashboard">
       <h2>Inicio</h2>
       <div class="cards-grid">
-        <div class="stat-card"><div class="stat-label">Capital aportado</div><div class="stat-value">${formatMoney(contributions)}</div></div>
-        <div class="stat-card"><div class="stat-label">Gastos</div><div class="stat-value">${formatMoney(expenses)}</div></div>
-        <div class="stat-card"><div class="stat-label">Ingresos</div><div class="stat-value">${formatMoney(sales)}</div></div>
-        <div class="stat-card"><div class="stat-label">Resultado</div><div class="stat-value">${formatMoney(resultado)}</div></div>
+        <div class="stat-card"><div class="stat-label">Capital aportado</div><div class="stat-value">${window.formatMoney(contributions)}</div></div>
+        <div class="stat-card"><div class="stat-label">Gastos</div><div class="stat-value">${window.formatMoney(expenses)}</div></div>
+        <div class="stat-card"><div class="stat-label">Ingresos</div><div class="stat-value">${window.formatMoney(sales)}</div></div>
+        <div class="stat-card"><div class="stat-label">Resultado</div><div class="stat-value">${window.formatMoney(resultado)}</div></div>
         <div class="stat-card"><div class="stat-label">Producción</div><div class="stat-value">${harvestKg} kg</div></div>
         <div class="stat-card"><div class="stat-label">Kg vendidos</div><div class="stat-value">${salesKg} kg</div></div>
       </div>
@@ -212,8 +194,8 @@ function renderDashboard() {
         ${recent.length ? recent.map(log => `
           <div class="list-item">
             <div class="list-main">
-              <span class="item-date">${formatDateTime(log.timestamp)}</span>
-              <span class="item-text">${escapeHtml(log.description)}</span>
+              <span class="item-date">${window.formatDateTime(log.timestamp)}</span>
+              <span class="item-text">${window.escapeHtml(log.description)}</span>
             </div>
           </div>`).join('') : '<p class="empty">Sin actividad</p>'}
       </div>
@@ -242,7 +224,7 @@ function computeAlerts() {
   });
 
   Object.values(state.data.sales || {}).filter(s => !s.deleted && s.paymentStatus !== 'COBRADO').forEach(sale => {
-    alerts.push({ type: 'alert-warning', icon: '💳', message: `Venta pendiente de cobro: ${sale.customer} - ${formatMoney(sale.total)}` });
+    alerts.push({ type: 'alert-warning', icon: '💳', message: `Venta pendiente de cobro: ${sale.customer} - ${window.formatMoney(sale.total)}` });
   });
 
   return alerts;
@@ -257,7 +239,7 @@ function getRecentActivity(limit = 5) {
 }
 
 function renderList(entity) {
-  const config = ENTITY_CONFIG[entity];
+  const config = window.ENTITY_CONFIG[entity];
   if (!config) return '<p class="empty">Entidad no configurada</p>';
   if (entity === 'users') return renderUsers();
   if (entity === 'attachments') return renderAttachments();
@@ -287,13 +269,13 @@ function renderList(entity) {
         if (!field) return;
         const value = record[fieldName];
         if (field.type === 'date' && value) {
-          html += `<span class="item-date">${formatDate(value)}</span>`;
+          html += `<span class="item-date">${window.formatDate(value)}</span>`;
         } else if (['number'].includes(field.type) || fieldName.match(/amount|cost|price|total|rate|capital|rentalCost/)) {
-          html += `<span class="item-number">${formatMoney(value)}</span>`;
+          html += `<span class="item-number">${window.formatMoney(value)}</span>`;
         } else if (field.type === 'checkbox') {
           html += `<span class="item-text">${value ? '✅' : '❌'}</span>`;
         } else {
-          html += `<span class="item-text">${escapeHtml(value ?? '')}</span>`;
+          html += `<span class="item-text">${window.escapeHtml(value ?? '')}</span>`;
         }
       });
       html += `</div>`;
@@ -318,7 +300,7 @@ function renderGroup(section) {
   }
   let html = `<div class="subnav">`;
   children.forEach(child => {
-    const cfg = ENTITY_CONFIG[child];
+    const cfg = window.ENTITY_CONFIG[child];
     if (!cfg) return;
     if (child === 'users' && state.userProfile?.role !== 'ADMIN') return;
     html += `<button class="chip ${child === state.currentChild ? 'active' : ''}" data-child="${child}">${cfg.icon} ${cfg.label}</button>`;
@@ -338,9 +320,9 @@ function renderUsers() {
       ${users.length ? users.map(user => `
         <div class="list-item">
           <div class="list-main">
-            <span class="item-text">${escapeHtml(user.name || 'Sin nombre')}</span>
-            <span class="item-text">${escapeHtml(user.email || '')}</span>
-            <span class="item-text">${escapeHtml(user.role || 'SOCIO')}</span>
+            <span class="item-text">${window.escapeHtml(user.name || 'Sin nombre')}</span>
+            <span class="item-text">${window.escapeHtml(user.email || '')}</span>
+            <span class="item-text">${window.escapeHtml(user.role || 'SOCIO')}</span>
             <span class="item-text">${user.active ? '✅' : '❌'}</span>
           </div>
           <div class="list-actions">
@@ -364,9 +346,9 @@ function renderAttachments() {
       ${Object.values(state.data.attachments || {}).filter(a => !a.deleted).sort((a,b)=>(b.uploadedAt||0)-(a.uploadedAt||0)).map(a => `
         <div class="list-item">
           <div class="list-main">
-            <span class="item-text">${escapeHtml(a.fileName || 'Archivo')}</span>
-            <span class="item-date">${formatDate(a.uploadedAt)}</span>
-            <span class="item-text"><a href="${escapeHtml(a.url)}" target="_blank">Ver</a></span>
+            <span class="item-text">${window.escapeHtml(a.fileName || 'Archivo')}</span>
+            <span class="item-date">${window.formatDate(a.uploadedAt)}</span>
+            <span class="item-text"><a href="${window.escapeHtml(a.url)}" target="_blank">Ver</a></span>
           </div>
         </div>`).join('') || '<p class="empty">No hay archivos.</p>'}
     </div>
@@ -382,10 +364,10 @@ function renderAuditLogs() {
       ${logs.length ? logs.map(log => `
         <div class="list-item">
           <div class="list-main">
-            <span class="item-date">${formatDateTime(log.timestamp)}</span>
-            <span class="item-text">${escapeHtml(log.userName || '')}</span>
-            <span class="item-text">${escapeHtml(log.action || '')}</span>
-            <span class="item-text">${escapeHtml(log.description || '')}</span>
+            <span class="item-date">${window.formatDateTime(log.timestamp)}</span>
+            <span class="item-text">${window.escapeHtml(log.userName || '')}</span>
+            <span class="item-text">${window.escapeHtml(log.action || '')}</span>
+            <span class="item-text">${window.escapeHtml(log.description || '')}</span>
           </div>
         </div>`).join('') : '<p class="empty">Sin registros.</p>'}
     </div>
@@ -442,7 +424,7 @@ function handleGlobalClick(e) {
 }
 
 function showForm(entity, record = null) {
-  const config = ENTITY_CONFIG[entity];
+  const config = window.ENTITY_CONFIG[entity];
   if (!config || config.fields.length === 0) return;
   const isEdit = !!record;
   const title = isEdit ? `Editar ${config.singular}` : `Nuevo ${config.singular}`;
@@ -472,15 +454,15 @@ function showForm(entity, record = null) {
 }
 
 function buildFormFields(entity, record = null) {
-  const config = ENTITY_CONFIG[entity];
-  const recordData = record || {}; // <-- Corrección clave
+  const config = window.ENTITY_CONFIG[entity];
+  const recordData = record || {};
   let html = '';
   config.fields.forEach(field => {
-    const value = recordData[field.name] ?? (field.type === 'date' ? todayISO() : '');
+    const value = recordData[field.name] ?? (field.type === 'date' ? window.todayISO() : '');
     html += `<div class="form-group"><label for="f_${field.name}">${field.label}</label>`;
     switch (field.type) {
       case 'textarea':
-        html += `<textarea id="f_${field.name}" name="${field.name}" ${field.required ? 'required' : ''}>${escapeHtml(value)}</textarea>`;
+        html += `<textarea id="f_${field.name}" name="${field.name}" ${field.required ? 'required' : ''}>${window.escapeHtml(value)}</textarea>`;
         break;
       case 'select':
         html += `<select id="f_${field.name}" name="${field.name}" ${field.required ? 'required' : ''}>`;
@@ -488,7 +470,7 @@ function buildFormFields(entity, record = null) {
         const options = getOptions(field);
         options.forEach(opt => {
           const selected = String(value) === String(opt.value) ? 'selected' : '';
-          html += `<option value="${escapeHtml(opt.value)}" ${selected}>${escapeHtml(opt.label)}</option>`;
+          html += `<option value="${window.escapeHtml(opt.value)}" ${selected}>${window.escapeHtml(opt.label)}</option>`;
         });
         html += `</select>`;
         break;
@@ -496,7 +478,7 @@ function buildFormFields(entity, record = null) {
         html += `<input type="checkbox" id="f_${field.name}" name="${field.name}" ${value ? 'checked' : ''}>`;
         break;
       default:
-        html += `<input type="${field.type}" id="f_${field.name}" name="${field.name}" value="${escapeHtml(value)}" ${field.required ? 'required' : ''} ${field.step ? `step="${field.step}"` : ''}>`;
+        html += `<input type="${field.type}" id="f_${field.name}" name="${field.name}" value="${window.escapeHtml(value)}" ${field.required ? 'required' : ''} ${field.step ? `step="${field.step}"` : ''}>`;
     }
     html += `</div>`;
   });
@@ -520,7 +502,7 @@ function getOptions(field) {
 }
 
 async function handleFormSubmit(entity, record) {
-  const config = ENTITY_CONFIG[entity];
+  const config = window.ENTITY_CONFIG[entity];
   const form = document.getElementById('entity-form');
   const formData = new FormData(form);
   const data = {};
@@ -530,17 +512,17 @@ async function handleFormSubmit(entity, record) {
     if (field.type === 'checkbox') value = formData.get(field.name) === 'on';
     data[field.name] = value;
   });
-  data.projectId = data.projectId || APP_CONFIG.defaultProjectId;
+  data.projectId = data.projectId || window.APP_CONFIG.defaultProjectId;
   data.updatedBy = state.currentUser.uid;
 
   try {
     if (record) {
-      await updateRecord(entity, record.id, data);
-      await writeAudit('update', entity, record.id, `Modificó ${config.singular.toLowerCase()}`, state.currentUser.uid, state.userProfile.name || state.userProfile.email);
+      await window.updateRecord(entity, record.id, data);
+      await window.writeAudit('update', entity, record.id, `Modificó ${config.singular.toLowerCase()}`, state.currentUser.uid, state.userProfile.name || state.userProfile.email);
     } else {
       data.createdBy = state.currentUser.uid;
-      const id = await createRecord(entity, data);
-      await writeAudit('create', entity, id, `Creó ${config.singular.toLowerCase()}`, state.currentUser.uid, state.userProfile.name || state.userProfile.email);
+      const id = await window.createRecord(entity, data);
+      await window.writeAudit('create', entity, id, `Creó ${config.singular.toLowerCase()}`, state.currentUser.uid, state.userProfile.name || state.userProfile.email);
     }
     closeModal();
     showToast('Registro guardado correctamente');
@@ -551,10 +533,10 @@ async function handleFormSubmit(entity, record) {
 
 function confirmDelete(entity, id) {
   if (!confirm('¿Seguro que deseas eliminar este registro? Se marcará como eliminado.')) return;
-  softDeleteRecord(entity, id, state.currentUser.uid)
+  window.softDeleteRecord(entity, id, state.currentUser.uid)
     .then(async () => {
-      const config = ENTITY_CONFIG[entity];
-      await writeAudit('delete', entity, id, `Eliminó ${config.singular.toLowerCase()}`, state.currentUser.uid, state.userProfile.name || state.userProfile.email);
+      const config = window.ENTITY_CONFIG[entity];
+      await window.writeAudit('delete', entity, id, `Eliminó ${config.singular.toLowerCase()}`, state.currentUser.uid, state.userProfile.name || state.userProfile.email);
       showToast('Registro eliminado');
     })
     .catch(() => showToast('No se pudo eliminar. Verifica permisos.'));
@@ -562,7 +544,7 @@ function confirmDelete(entity, id) {
 
 async function toggleUserRole(uid, newRole) {
   try {
-    await updateRecord('users', uid, { role: newRole, updatedBy: state.currentUser.uid });
+    await window.updateRecord('users', uid, { role: newRole, updatedBy: state.currentUser.uid });
     showToast('Rol actualizado');
   } catch (err) {
     showToast('No se pudo cambiar el rol.');
@@ -571,7 +553,7 @@ async function toggleUserRole(uid, newRole) {
 
 async function toggleUserActive(uid, active) {
   try {
-    await updateRecord('users', uid, { active, updatedBy: state.currentUser.uid });
+    await window.updateRecord('users', uid, { active, updatedBy: state.currentUser.uid });
     showToast(active ? 'Usuario activado' : 'Usuario desactivado');
   } catch (err) {
     showToast('No se pudo cambiar el estado.');
@@ -579,14 +561,14 @@ async function toggleUserActive(uid, active) {
 }
 
 function showQuickMenu() {
-  const entities = Object.keys(ENTITY_CONFIG).filter(e => e !== 'users' && e !== 'auditLogs' && e !== 'attachments' && ENTITY_CONFIG[e].fields.length > 0);
+  const entities = Object.keys(window.ENTITY_CONFIG).filter(e => e !== 'users' && e !== 'auditLogs' && e !== 'attachments' && window.ENTITY_CONFIG[e].fields.length > 0);
   const modal = document.getElementById('quick-menu');
   modal.innerHTML = `
     <div class="modal-content">
       <div class="modal-header"><h3>Registro rápido</h3><button class="modal-close" data-dismiss="quick">×</button></div>
       <div class="quick-grid">
         ${entities.map(e => `
-          <button class="chip quick-item" data-quick="${e}">${ENTITY_CONFIG[e].icon} ${ENTITY_CONFIG[e].label}</button>
+          <button class="chip quick-item" data-quick="${e}">${window.ENTITY_CONFIG[e].icon} ${window.ENTITY_CONFIG[e].label}</button>
         `).join('')}
       </div>
     </div>`;
@@ -619,7 +601,7 @@ function showToast(message) {
 
 // Cloudinary upload
 async function uploadAttachment(file) {
-  const { cloudName, uploadPreset, folder } = CLOUDINARY_CONFIG;
+  const { cloudName, uploadPreset, folder } = window.CLOUDINARY_CONFIG;
   if (!cloudName || cloudName === 'TU_CLOUD_NAME') {
     showToast('Configura Cloudinary en js/config.js');
     return;
@@ -640,8 +622,7 @@ async function uploadAttachment(file) {
   xhr.onload = async () => {
     if (xhr.status >= 200 && xhr.status < 300) {
       const response = JSON.parse(xhr.responseText);
-      const attachmentRef = await import('./database.js');
-      await attachmentRef.createRecord('attachments', {
+      await window.createRecord('attachments', {
         url: response.secure_url,
         publicId: response.public_id,
         resourceType: response.resource_type,

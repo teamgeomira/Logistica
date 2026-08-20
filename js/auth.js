@@ -1,43 +1,35 @@
-import { auth, db } from './firebase.js';
-import {
-  signInWithEmailAndPassword,
-  signOut,
-  sendPasswordResetEmail,
-  onAuthStateChanged
-} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { ref, get } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+// Funciones globales de autenticación
+window.login = function(email, password) {
+  return window.auth.signInWithEmailAndPassword(email, password);
+};
 
-export async function login(email, password) {
-  return signInWithEmailAndPassword(auth, email, password);
-}
+window.logout = function() {
+  return window.auth.signOut();
+};
 
-export async function logout() {
-  return signOut(auth);
-}
+window.resetPassword = function(email) {
+  return window.auth.sendPasswordResetEmail(email);
+};
 
-export async function resetPassword(email) {
-  return sendPasswordResetEmail(auth, email);
-}
-
-export function watchAuth(callback) {
-  onAuthStateChanged(auth, async (user) => {
+window.watchAuth = function(callback) {
+  window.auth.onAuthStateChanged(async (user) => {
     if (user) {
       try {
-        const userRef = ref(db, `users/${user.uid}`);
-        const snap = await get(userRef);
+        const userRef = window.db.ref(`users/${user.uid}`);
+        const snap = await userRef.get();
         const profile = snap.val();
         if (!profile || profile.active === false) {
-          await signOut(auth);
+          await window.auth.signOut();
           callback(null, { error: 'Usuario inactivo o no autorizado.' });
         } else {
           callback(user, profile);
         }
       } catch (error) {
-        await signOut(auth);
+        await window.auth.signOut();
         callback(null, { error: 'Error al cargar perfil.' });
       }
     } else {
       callback(null, null);
     }
   });
-}
+};

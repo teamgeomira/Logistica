@@ -1,25 +1,24 @@
-import { APP_CONFIG } from './config.js';
-
-export function formatMoney(amount, currency = APP_CONFIG.currency) {
+// Utilidades globales
+window.formatMoney = function(amount, currency = window.APP_CONFIG.currency) {
   return new Intl.NumberFormat('es-ES', {
     style: 'currency',
     currency
   }).format(Number(amount) || 0);
-}
+};
 
-export function formatDate(ts) {
+window.formatDate = function(ts) {
   if (!ts) return '';
   const date = new Date(ts);
   return date.toLocaleDateString('es-ES');
-}
+};
 
-export function formatDateTime(ts) {
+window.formatDateTime = function(ts) {
   if (!ts) return '';
   const date = new Date(ts);
   return date.toLocaleString('es-ES');
-}
+};
 
-export function escapeHtml(str) {
+window.escapeHtml = function(str) {
   if (str === null || str === undefined) return '';
   return String(str)
     .replace(/&/g, '&amp;')
@@ -27,16 +26,16 @@ export function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
-}
+};
 
-export function todayISO() {
+window.todayISO = function() {
   return new Date().toISOString().split('T')[0];
-}
+};
 
-export function debounce(fn, delay = 300) {
+window.debounce = function(fn, delay = 300) {
   let timer;
   return (...args) => {
     clearTimeout(timer);
     timer = setTimeout(() => fn(...args), delay);
   };
-}
+};

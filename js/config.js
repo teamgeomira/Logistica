@@ -1,5 +1,5 @@
-// Configuración pública de Firebase
-export const FIREBASE_CONFIG = {
+// Configuración pública (global)
+window.FIREBASE_CONFIG = {
   apiKey: "AIzaSyBI4O0d_Mec38FDiuhirujCnX99PFKiXW4",
   authDomain: "projekt-pc.firebaseapp.com",
   databaseURL: "https://projekt-pc-default-rtdb.europe-west1.firebasedatabase.app",
@@ -9,21 +9,18 @@ export const FIREBASE_CONFIG = {
   appId: "1:90098431634:web:7cb61800d03533c2a6984b"
 };
 
-// Configuración Cloudinary (NO incluir secretos)
-export const CLOUDINARY_CONFIG = {
+window.CLOUDINARY_CONFIG = {
   cloudName: "TU_CLOUD_NAME", // <- cambiar por el cloud name real
   uploadPreset: "logistica",
   folder: "malanga"
 };
 
-// Configuración general de la aplicación
-export const APP_CONFIG = {
+window.APP_CONFIG = {
   currency: "EUR",
   defaultProjectId: "malanga-2026"
 };
 
-// Definición de la navegación principal
-export const NAV_SECTIONS = [
+window.NAV_SECTIONS = [
   { id: 'dashboard', label: 'Inicio', icon: '🏠', type: 'dashboard' },
   { id: 'journal', label: 'Actividad', icon: '📋', type: 'list', entity: 'journal' },
   { id: 'finanzas', label: 'Finanzas', icon: '💰', type: 'group', children: ['expenses', 'contributions', 'sales'] },
@@ -31,8 +28,7 @@ export const NAV_SECTIONS = [
   { id: 'mas', label: 'Más', icon: '⋯', type: 'group', children: ['attachments', 'auditLogs', 'users'] }
 ];
 
-// Esquema de entidades para formularios y listados
-export const ENTITY_CONFIG = {
+window.ENTITY_CONFIG = {
   lands: {
     label: 'Terrenos', singular: 'Terreno', icon: '🗺️',
     listFields: ['name', 'location', 'status', 'rentalCost'],

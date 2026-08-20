@@ -1,54 +1,45 @@
-import { db } from './firebase.js';
-import {
-  ref,
-  onValue,
-  push,
-  set,
-  update,
-  serverTimestamp
-} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
-
-export function subscribeToEntity(entity, callback) {
-  const entityRef = ref(db, entity);
-  return onValue(entityRef, (snapshot) => {
+// Funciones globales de base de datos
+window.subscribeToEntity = function(entity, callback) {
+  const entityRef = window.db.ref(entity);
+  return entityRef.on('value', (snapshot) => {
     callback(snapshot.val() || {});
   });
-}
+};
 
-export async function createRecord(entity, data) {
-  const listRef = ref(db, entity);
-  const newRef = push(listRef);
+window.createRecord = async function(entity, data) {
+  const listRef = window.db.ref(entity);
+  const newRef = listRef.push();
   const record = {
     ...data,
     id: newRef.key,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
+    createdAt: firebase.database.ServerValue.TIMESTAMP,
+    updatedAt: firebase.database.ServerValue.TIMESTAMP
   };
-  await set(newRef, record);
+  await newRef.set(record);
   return newRef.key;
-}
+};
 
-export async function updateRecord(entity, id, data) {
-  const recordRef = ref(db, `${entity}/${id}`);
-  await update(recordRef, {
+window.updateRecord = async function(entity, id, data) {
+  const recordRef = window.db.ref(`${entity}/${id}`);
+  await recordRef.update({
     ...data,
-    updatedAt: serverTimestamp()
+    updatedAt: firebase.database.ServerValue.TIMESTAMP
   });
-}
+};
 
-export async function softDeleteRecord(entity, id, userId) {
-  const recordRef = ref(db, `${entity}/${id}`);
-  await update(recordRef, {
+window.softDeleteRecord = async function(entity, id, userId) {
+  const recordRef = window.db.ref(`${entity}/${id}`);
+  await recordRef.update({
     deleted: true,
-    deletedAt: serverTimestamp(),
+    deletedAt: firebase.database.ServerValue.TIMESTAMP,
     deletedBy: userId
   });
-}
+};
 
-export async function writeAudit(action, entity, entityId, description, userId, userName) {
-  const auditRef = ref(db, 'auditLogs');
-  const newAudit = push(auditRef);
-  await set(newAudit, {
+window.writeAudit = async function(action, entity, entityId, description, userId, userName) {
+  const auditRef = window.db.ref('auditLogs');
+  const newAudit = auditRef.push();
+  await newAudit.set({
     id: newAudit.key,
     userId,
     userName,
@@ -56,13 +47,13 @@ export async function writeAudit(action, entity, entityId, description, userId, 
     entity,
     entityId,
     description,
-    timestamp: serverTimestamp()
+    timestamp: firebase.database.ServerValue.TIMESTAMP
   });
-}
+};
 
-export function onConnectionChange(callback) {
-  const connectedRef = ref(db, '.info/connected');
-  return onValue(connectedRef, (snap) => {
+window.onConnectionChange = function(callback) {
+  const connectedRef = window.db.ref('.info/connected');
+  connectedRef.on('value', (snap) => {
     callback(snap.val() === true);
   });
-}
+};
