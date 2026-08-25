@@ -26,6 +26,16 @@ window.formatDateTime = function(ts) {
   });
 };
 
+// Formatear número como moneda
+window.formatMoney = function(amount) {
+  if (amount === undefined || amount === null || isNaN(amount)) return '';
+  const symbol = window.APP_CONFIG?.currencySymbol || '$';
+  return symbol + Number(amount).toLocaleString('es-ES', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
 // Escapar HTML para seguridad
 window.escapeHtml = function(str) {
   if (str === null || str === undefined) return '';
