@@ -1,8 +1,714 @@
 // ================================================================
-// APLICACIÓN PRINCIPAL - MALANGA v2.1.0
+// MALANGA v2.1.0 - APLICACIÓN COMPLETA UNIFICADA
 // ================================================================
 
-const state = {
+// ================================================================
+// 1. CONFIGURACIÓN
+// ================================================================
+
+window.FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBI4O0d_Mec38FDiuhirujCnX99PFKiXW4",
+  authDomain: "projekt-pc.firebaseapp.com",
+  databaseURL: "https://projekt-pc-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "projekt-pc",
+  storageBucket: "projekt-pc.appspot.com",
+  messagingSenderId: "90098431634",
+  appId: "1:90098431634:web:7cb61800d03533c2a6984b"
+};
+
+window.CLOUDINARY_CONFIG = {
+  cloudName: "TU_CLOUD_NAME",
+  uploadPreset: "logistica",
+  folder: "malanga"
+};
+
+window.APP_CONFIG = {
+  currency: "USD",
+  currencySymbol: "$",
+  defaultProjectId: "malanga-2026",
+  appName: "Malanga - Gestión Agrícola",
+  version: "2.1.0"
+};
+
+window.DEFAULT_SETTINGS = {
+  currency: 'USD',
+  currencySymbol: '$',
+  companyName: 'Malanga Agrícola',
+  companyEmail: 'info@malanga.com',
+  companyPhone: '+1 123 456 7890',
+  taxRate: 0,
+  defaultProject: 'malanga-2026'
+};
+
+// ================================================================
+// 2. UTILIDADES
+// ================================================================
+
+window.formatDate = function(ts) {
+  if (!ts) return '';
+  try {
+    var date = new Date(ts);
+    if (isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  } catch (e) { return ''; }
+};
+
+window.formatDateTime = function(ts) {
+  if (!ts) return '';
+  try {
+    var date = new Date(ts);
+    if (isNaN(date.getTime())) return '';
+    return date.toLocaleString('es-ES', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (e) { return ''; }
+};
+
+window.formatMoney = function(amount) {
+  if (amount === undefined || amount === null) return '';
+  var num = Number(amount);
+  if (isNaN(num)) return '';
+  var symbol = window.APP_CONFIG?.currencySymbol || '$';
+  return symbol + num.toLocaleString('es-ES', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
+window.escapeHtml = function(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+};
+
+window.todayISO = function() {
+  try { return new Date().toISOString().split('T')[0]; } catch (e) { return ''; }
+};
+
+window.debounce = function(fn, delay) {
+  delay = delay || 300;
+  var timer;
+  return function() {
+    var args = arguments;
+    var context = this;
+    clearTimeout(timer);
+    timer = setTimeout(function() { fn.apply(context, args); }, delay);
+  };
+};
+
+// Cálculos automáticos
+window.updateCalculatedFields = function(entity, form) {
+  var config = window.ENTITY_CONFIG[entity];
+  if (!config || !config.fields) return;
+  config.fields.forEach(function(field) {
+    if (field.calculatedFrom && field.calculatedFrom.length > 0) {
+      var targetInput = form.querySelector('[name="' + field.name + '"]');
+      if (!targetInput) return;
+      var values = field.calculatedFrom.map(function(srcName) {
+        var input = form.querySelector('[name="' + srcName + '"]');
+        if (!input) return 0;
+        return parseFloat(input.value) || 0;
+      });
+      var result = values.reduce(function(acc, val) { return acc * val; }, 1);
+      var isMoney = field.name === 'amount' || field.name === 'total' || field.name === 'cost' || field.name === 'price';
+      targetInput.value = isMoney ? result.toFixed(2) : result;
+      var event = new Event('change', { bubbles: true });
+      targetInput.dispatchEvent(event);
+    }
+  });
+};
+
+window.bindAutoCalculations = function(entity, form) {
+  var config = window.ENTITY_CONFIG[entity];
+  if (!config || !config.fields) return;
+  var calculatedFields = config.fields.filter(function(f) { return f.calculatedFrom && f.calculatedFrom.length > 0; });
+  if (calculatedFields.length === 0) return;
+  var sourceFields = [];
+  calculatedFields.forEach(function(f) {
+    f.calculatedFrom.forEach(function(src) {
+      if (sourceFields.indexOf(src) === -1) sourceFields.push(src);
+    });
+  });
+  sourceFields.forEach(function(fieldName) {
+    var input = form.querySelector('[name="' + fieldName + '"]');
+    if (!input) return;
+    var update = window.debounce(function() { window.updateCalculatedFields(entity, form); }, 150);
+    input.addEventListener('input', update);
+    input.addEventListener('change', update);
+    input.addEventListener('keyup', update);
+    input.addEventListener('blur', update);
+  });
+  setTimeout(function() { window.updateCalculatedFields(entity, form); }, 50);
+};
+
+// ================================================================
+// 3. INICIALIZACIÓN DE FIREBASE
+// ================================================================
+
+console.log('🔥 Inicializando Firebase...');
+
+try {
+  var app = firebase.initializeApp(window.FIREBASE_CONFIG);
+  window.auth = firebase.auth(app);
+  window.db = firebase.database(app);
+  console.log('✅ Firebase inicializado correctamente');
+} catch (error) {
+  console.error('❌ Error al inicializar Firebase:', error);
+}
+
+// ================================================================
+// 4. NAVEGACIÓN Y CONFIGURACIÓN DE ENTIDADES
+// ================================================================
+
+window.NAV_SECTIONS = [
+  { id: 'dashboard', label: 'Inicio', icon: '🏠', type: 'dashboard' },
+  { id: 'partners', label: 'Socios', icon: '👥', type: 'list', entity: 'partners' },
+  {
+    id: 'finanzas', label: 'Finanzas', icon: '💰', type: 'group',
+    children: [
+      { id: 'expenses', label: 'Gastos', icon: '💸', entity: 'expenses' },
+      { id: 'contributions', label: 'Aportaciones', icon: '🏦', entity: 'contributions' },
+      { id: 'sales', label: 'Ventas', icon: '💰', entity: 'sales' }
+    ]
+  },
+  {
+    id: 'cultivo', label: 'Cultivo', icon: '🌱', type: 'group',
+    children: [
+      { id: 'lands', label: 'Terrenos', icon: '🗺️', entity: 'lands' },
+      { id: 'workers', label: 'Trabajadores', icon: '👤', entity: 'workers' },
+      { id: 'workLogs', label: 'Jornales', icon: '⏱️', entity: 'workLogs' },
+      { id: 'seeds', label: 'Semillas', icon: '🌰', entity: 'seeds' },
+      { id: 'agriculturalProducts', label: 'Abonos/Productos', icon: '🧪', entity: 'agriculturalProducts' },
+      { id: 'cropActivities', label: 'Labores', icon: '🚜', entity: 'cropActivities' },
+      { id: 'incidents', label: 'Incidencias', icon: '⚠️', entity: 'incidents' },
+      { id: 'harvests', label: 'Cosechas', icon: '🌾', entity: 'harvests' }
+    ]
+  },
+  { id: 'journal', label: 'Bitácora', icon: '📋', type: 'list', entity: 'journal' },
+  { id: 'configuracion', label: 'Configuración', icon: '⚙️', type: 'config' },
+  {
+    id: 'mas', label: 'Más', icon: '⋯', type: 'group',
+    children: [
+      { id: 'attachments', label: 'Archivos', icon: '📎', entity: 'attachments' },
+      { id: 'auditLogs', label: 'Auditoría', icon: '🧾', entity: 'auditLogs' },
+      { id: 'users', label: 'Usuarios', icon: '👥', entity: 'users' }
+    ]
+  }
+];
+
+// ENTITY_CONFIG
+window.ENTITY_CONFIG = {};
+
+// ================================================================
+// SOCIOS (PARTNERS)
+// ================================================================
+window.ENTITY_CONFIG.partners = {
+  label: 'Socios', singular: 'Socio', icon: '👥',
+  listFields: ['name', 'email', 'phone', 'status', 'balance'],
+  fields: [
+    { name: 'name', label: 'Nombre completo', type: 'text', required: true },
+    { name: 'email', label: 'Correo electrónico', type: 'email', required: true },
+    { name: 'phone', label: 'Teléfono', type: 'tel' },
+    { name: 'documentType', label: 'Tipo de documento', type: 'select', options: ['CEDULA', 'PASAPORTE', 'RUC', 'NIT', 'OTRO'], defaultValue: 'CEDULA' },
+    { name: 'documentNumber', label: 'Número de documento', type: 'text' },
+    { name: 'address', label: 'Dirección', type: 'textarea' },
+    { name: 'status', label: 'Estado', type: 'select', options: ['ACTIVO', 'INACTIVO', 'PENDIENTE'], defaultValue: 'ACTIVO' },
+    { name: 'initialBalance', label: 'Saldo inicial', type: 'number', step: '0.01', min: 0, defaultValue: 0 },
+    { name: 'joinDate', label: 'Fecha de ingreso', type: 'date', required: true },
+    { name: 'notes', label: 'Notas', type: 'textarea' }
+  ],
+  fieldGroups: [
+    { title: '📋 Información personal', fields: ['name', 'email', 'phone', 'documentType', 'documentNumber'] },
+    { title: '📍 Dirección y estado', fields: ['address', 'status', 'joinDate'] },
+    { title: '💰 Saldo', fields: ['initialBalance'] },
+    { title: '📝 Notas', fields: ['notes'] }
+  ]
+};
+
+// ================================================================
+// TERRENOS (LANDS)
+// ================================================================
+window.ENTITY_CONFIG.lands = {
+  label: 'Terrenos', singular: 'Terreno', icon: '🗺️',
+  listFields: ['name', 'location', 'area', 'status', 'rentalCost'],
+  fields: [
+    { name: 'name', label: 'Nombre del terreno', type: 'text', required: true },
+    { name: 'location', label: 'Ubicación', type: 'text', required: true },
+    { name: 'area', label: 'Área', type: 'number', step: '0.01', required: true, min: 0 },
+    { name: 'areaUnit', label: 'Unidad de área', type: 'select', options: ['ha', 'm²', 'acres'], defaultValue: 'ha' },
+    { name: 'owner', label: 'Propietario', type: 'text' },
+    { name: 'rentalStart', label: 'Inicio de alquiler', type: 'date' },
+    { name: 'rentalEnd', label: 'Fin de alquiler', type: 'date' },
+    { name: 'rentalCost', label: 'Coste de alquiler', type: 'number', step: '0.01', min: 0 },
+    { name: 'status', label: 'Estado', type: 'select', options: ['PLANIFICADO', 'ACTIVO', 'FINALIZADO'], defaultValue: 'PLANIFICADO' },
+    { name: 'notes', label: 'Notas', type: 'textarea' }
+  ],
+  fieldGroups: [
+    { title: '📍 Datos básicos', fields: ['name', 'location', 'area', 'areaUnit'] },
+    { title: '🏠 Propiedad', fields: ['owner', 'rentalStart', 'rentalEnd', 'rentalCost'] },
+    { title: '📊 Estado', fields: ['status'] },
+    { title: '📝 Notas', fields: ['notes'] }
+  ]
+};
+
+// ================================================================
+// GASTOS (EXPENSES)
+// ================================================================
+window.ENTITY_CONFIG.expenses = {
+  label: 'Gastos', singular: 'Gasto', icon: '💸',
+  listFields: ['date', 'category', 'concept', 'amount', 'paymentMethod'],
+  fields: [
+    { name: 'date', label: 'Fecha del gasto', type: 'date', required: true },
+    { name: 'category', label: 'Categoría', type: 'select', required: true, options: ['TERRENO', 'SEMILLA', 'ABONO', 'PRODUCTOS', 'TRABAJADORES', 'HERRAMIENTAS', 'MAQUINARIA', 'TRANSPORTE', 'COMBUSTIBLE', 'RIEGO', 'ALIMENTACION', 'REPARACION', 'OTROS'] },
+    { name: 'concept', label: 'Concepto', type: 'text', required: true },
+    { name: 'provider', label: 'Proveedor', type: 'text' },
+    { name: 'amount', label: 'Importe', type: 'number', step: '0.01', required: true, min: 0 },
+    { name: 'paymentMethod', label: 'Método de pago', type: 'select', options: ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA', 'OTRO'] },
+    { name: 'landId', label: 'Terreno', type: 'select', optionsFrom: 'lands' },
+    { name: 'partnerId', label: 'Socio responsable', type: 'select', optionsFrom: 'partners' },
+    { name: 'notes', label: 'Notas', type: 'textarea' }
+  ],
+  fieldGroups: [
+    { title: '📋 Datos del gasto', fields: ['date', 'category', 'concept', 'amount'] },
+    { title: 'ℹ️ Información adicional', fields: ['provider', 'paymentMethod', 'landId', 'partnerId'] },
+    { title: '📝 Notas', fields: ['notes'] }
+  ],
+  transactionType: 'expense'
+};
+
+// ================================================================
+// APORTACIONES (CONTRIBUTIONS)
+// ================================================================
+window.ENTITY_CONFIG.contributions = {
+  label: 'Aportaciones', singular: 'Aportación', icon: '🏦',
+  listFields: ['date', 'partnerName', 'amount', 'paymentMethod'],
+  fields: [
+    { name: 'date', label: 'Fecha de aportación', type: 'date', required: true },
+    { name: 'partnerId', label: 'Socio', type: 'select', optionsFrom: 'partners', required: true },
+    { name: 'amount', label: 'Importe', type: 'number', step: '0.01', required: true, min: 0 },
+    { name: 'paymentMethod', label: 'Método de pago', type: 'select', options: ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA', 'OTRO'] },
+    { name: 'concept', label: 'Concepto', type: 'text' },
+    { name: 'notes', label: 'Notas', type: 'textarea' }
+  ],
+  fieldGroups: [
+    { title: '📋 Datos de la aportación', fields: ['date', 'partnerId', 'amount'] },
+    { title: 'ℹ️ Información adicional', fields: ['paymentMethod', 'concept'] },
+    { title: '📝 Notas', fields: ['notes'] }
+  ],
+  transactionType: 'income'
+};
+
+// ================================================================
+// TRABAJADORES (WORKERS)
+// ================================================================
+window.ENTITY_CONFIG.workers = {
+  label: 'Trabajadores', singular: 'Trabajador', icon: '👤',
+  listFields: ['name', 'phone', 'type', 'rate', 'rateUnit'],
+  fields: [
+    { name: 'name', label: 'Nombre completo', type: 'text', required: true },
+    { name: 'phone', label: 'Teléfono', type: 'tel' },
+    { name: 'type', label: 'Tipo de trabajador', type: 'select', options: ['FIJO', 'TEMPORAL', 'CONTRATISTA'], defaultValue: 'TEMPORAL' },
+    { name: 'rate', label: 'Tarifa por día', type: 'number', step: '0.01', min: 0 },
+    { name: 'rateUnit', label: 'Unidad de tarifa', type: 'select', options: ['día', 'hora', 'mes', 'tarea'], defaultValue: 'día' },
+    { name: 'notes', label: 'Notas', type: 'textarea' }
+  ],
+  fieldGroups: [
+    { title: '👤 Datos personales', fields: ['name', 'phone'] },
+    { title: '💼 Información laboral', fields: ['type', 'rate', 'rateUnit'] },
+    { title: '📝 Notas', fields: ['notes'] }
+  ]
+};
+
+// ================================================================
+// JORNALES (WORKLOGS) - Cálculo: días × tarifa
+// ================================================================
+window.ENTITY_CONFIG.workLogs = {
+  label: 'Jornales', singular: 'Jornal', icon: '⏱️',
+  listFields: ['date', 'workerName', 'activity', 'days', 'amount'],
+  fields: [
+    { name: 'date', label: 'Fecha', type: 'date', required: true },
+    { name: 'workerId', label: 'Trabajador', type: 'select', optionsFrom: 'workers', required: true },
+    { name: 'landId', label: 'Terreno', type: 'select', optionsFrom: 'lands' },
+    { name: 'activity', label: 'Actividad realizada', type: 'text', required: true },
+    { name: 'days', label: 'Días trabajados', type: 'number', step: '0.5', min: 0, required: true },
+    { name: 'rate', label: 'Tarifa por día', type: 'number', step: '0.01', min: 0, required: true },
+    { name: 'amount', label: 'Importe total', type: 'number', step: '0.01', required: true, min: 0, calculatedFrom: ['days', 'rate'], readOnly: true },
+    { name: 'paid', label: 'Pagado', type: 'checkbox' }
+  ],
+  fieldGroups: [
+    { title: '📋 Datos del jornal', fields: ['date', 'workerId', 'landId', 'activity'] },
+    { title: '🧮 Cálculo', fields: ['days', 'rate', 'amount'] },
+    { title: '💰 Estado de pago', fields: ['paid'] }
+  ],
+  transactionType: 'expense'
+};
+
+// ================================================================
+// SEMILLAS (SEEDS) - Unidades: kg, libras, sacos, quintales, toneladas
+// ================================================================
+window.ENTITY_CONFIG.seeds = {
+  label: 'Semillas', singular: 'Semilla', icon: '🌰',
+  listFields: ['date', 'variety', 'quantity', 'unit', 'total'],
+  fields: [
+    { name: 'date', label: 'Fecha', type: 'date', required: true },
+    { name: 'provider', label: 'Proveedor', type: 'text' },
+    { name: 'variety', label: 'Variedad', type: 'text', required: true },
+    { name: 'quantity', label: 'Cantidad', type: 'number', step: '0.01', required: true, min: 0 },
+    { name: 'unit', label: 'Unidad de medida', type: 'select', options: ['kg', 'libras', 'sacos', 'quintales', 'toneladas'], defaultValue: 'kg' },
+    { name: 'price', label: 'Precio unitario', type: 'number', step: '0.01', min: 0 },
+    { name: 'total', label: 'Total', type: 'number', step: '0.01', required: true, min: 0, calculatedFrom: ['quantity', 'price'], readOnly: true },
+    { name: 'landId', label: 'Terreno', type: 'select', optionsFrom: 'lands' },
+    { name: 'partnerId', label: 'Socio responsable', type: 'select', optionsFrom: 'partners' },
+    { name: 'notes', label: 'Notas', type: 'textarea' }
+  ],
+  fieldGroups: [
+    { title: '📋 Datos de la semilla', fields: ['date', 'provider', 'variety'] },
+    { title: '📊 Cantidad y precio', fields: ['quantity', 'unit', 'price', 'total'] },
+    { title: '📍 Ubicación y responsable', fields: ['landId', 'partnerId'] },
+    { title: '📝 Notas', fields: ['notes'] }
+  ],
+  transactionType: 'expense'
+};
+
+// ================================================================
+// ABONOS / PRODUCTOS AGRÍCOLAS - Unidades completas
+// ================================================================
+window.ENTITY_CONFIG.agriculturalProducts = {
+  label: 'Abonos/Productos', singular: 'Producto', icon: '🧪',
+  listFields: ['date', 'product', 'type', 'quantity', 'unit', 'total'],
+  fields: [
+    { name: 'date', label: 'Fecha', type: 'date', required: true },
+    { name: 'product', label: 'Nombre del producto', type: 'text', required: true },
+    { name: 'type', label: 'Tipo de producto', type: 'select', options: ['ABONO', 'FERTILIZANTE', 'HERBICIDA', 'INSECTICIDA', 'FUNGICIDA', 'REMEDIO', 'OTRO'], required: true },
+    { name: 'quantity', label: 'Cantidad', type: 'number', step: '0.01', required: true, min: 0 },
+    { name: 'unit', label: 'Unidad de medida', type: 'select', options: ['kg', 'libras', 'quintal', 'litros', 'caneca', 'frasco', 'galón', 'bolsa', 'sobre', 'caja', 'unidad'], defaultValue: 'kg' },
+    { name: 'price', label: 'Precio unitario', type: 'number', step: '0.01', min: 0 },
+    { name: 'total', label: 'Total', type: 'number', step: '0.01', required: true, min: 0, calculatedFrom: ['quantity', 'price'], readOnly: true },
+    { name: 'provider', label: 'Proveedor', type: 'text' },
+    { name: 'landId', label: 'Terreno', type: 'select', optionsFrom: 'lands' },
+    { name: 'partnerId', label: 'Socio responsable', type: 'select', optionsFrom: 'partners' },
+    { name: 'applicationReason', label: 'Motivo de aplicación', type: 'text' },
+    { name: 'dose', label: 'Dosis aplicada', type: 'text' },
+    { name: 'notes', label: 'Notas', type: 'textarea' }
+  ],
+  fieldGroups: [
+    { title: '📋 Datos del producto', fields: ['date', 'product', 'type'] },
+    { title: '📊 Cantidad y precio', fields: ['quantity', 'unit', 'price', 'total'] },
+    { title: '🧪 Aplicación', fields: ['provider', 'landId', 'partnerId', 'applicationReason', 'dose'] },
+    { title: '📝 Notas', fields: ['notes'] }
+  ],
+  transactionType: 'expense'
+};
+
+// ================================================================
+// LABORES (CROP ACTIVITIES) - Con lista de tareas para malanga
+// ================================================================
+window.ENTITY_CONFIG.cropActivities = {
+  label: 'Labores', singular: 'Labor', icon: '🚜',
+  listFields: ['date', 'activity', 'landName', 'responsible', 'cost'],
+  fields: [
+    { name: 'date', label: 'Fecha', type: 'date', required: true },
+    { name: 'landId', label: 'Terreno', type: 'select', optionsFrom: 'lands', required: true },
+    { name: 'activity', label: 'Tipo de labor', type: 'select', required: true, options: [
+      'PREPARACIÓN DEL TERRENO',
+      'ROZA Y LIMPIEZA',
+      'ARADO',
+      'RASTRILLO',
+      'SURCADO',
+      'AHOYADO',
+      'SIEMBRA DE MALANGA',
+      'RIEGO',
+      'FERTILIZACIÓN',
+      'APLICACIÓN DE ABONO',
+      'APLICACIÓN DE HERBICIDA',
+      'APLICACIÓN DE INSECTICIDA',
+      'APLICACIÓN DE FUNGICIDA',
+      'CONTROL DE PLAGAS',
+      'CONTROL DE MALEZAS',
+      'DESHIERBE MANUAL',
+      'DESHIERBE QUÍMICO',
+      'ACOLCHADO',
+      'TUTORADO',
+      'PODA',
+      'COSECHA DE MALANGA',
+      'CLASIFICACIÓN DE COSECHA',
+      'EMPAQUE',
+      'TRANSPORTE',
+      'OTRA LABOR'
+    ] },
+    { name: 'activityDetail', label: 'Descripción detallada', type: 'textarea' },
+    { name: 'responsible', label: 'Responsable', type: 'text' },
+    { name: 'workers', label: 'Trabajadores (nombres)', type: 'text' },
+    { name: 'workersCount', label: 'Número de trabajadores', type: 'number', step: '1', min: 0 },
+    { name: 'duration', label: 'Duración (horas)', type: 'number', step: '0.5', min: 0 },
+    { name: 'materials', label: 'Materiales utilizados', type: 'textarea' },
+    { name: 'cost', label: 'Coste total', type: 'number', step: '0.01', min: 0 },
+    { name: 'notes', label: 'Notas', type: 'textarea' }
+  ],
+  fieldGroups: [
+    { title: '📋 Datos de la labor', fields: ['date', 'landId', 'activity', 'activityDetail'] },
+    { title: '👥 Recursos humanos', fields: ['responsible', 'workers', 'workersCount', 'duration'] },
+    { title: '🧰 Materiales y coste', fields: ['materials', 'cost'] },
+    { title: '📝 Notas', fields: ['notes'] }
+  ],
+  transactionType: 'expense'
+};
+
+// ================================================================
+// INCIDENCIAS (INCIDENTS)
+// ================================================================
+window.ENTITY_CONFIG.incidents = {
+  label: 'Incidencias', singular: 'Incidencia', icon: '⚠️',
+  listFields: ['date', 'type', 'severity', 'status', 'description'],
+  fields: [
+    { name: 'date', label: 'Fecha', type: 'date', required: true },
+    { name: 'landId', label: 'Terreno', type: 'select', optionsFrom: 'lands' },
+    { name: 'type', label: 'Tipo de incidencia', type: 'select', options: ['PLAGA', 'ENFERMEDAD', 'CLIMA', 'RIEGO', 'MAQUINARIA', 'OTRO'] },
+    { name: 'severity', label: 'Severidad', type: 'select', options: ['BAJA', 'MEDIA', 'ALTA'] },
+    { name: 'description', label: 'Descripción', type: 'textarea', required: true },
+    { name: 'action', label: 'Acción tomada', type: 'textarea' },
+    { name: 'cost', label: 'Coste', type: 'number', step: '0.01', min: 0 },
+    { name: 'responsible', label: 'Responsable', type: 'text' },
+    { name: 'status', label: 'Estado', type: 'select', options: ['OPEN', 'IN_PROGRESS', 'RESOLVED'], defaultValue: 'OPEN' },
+    { name: 'notes', label: 'Notas', type: 'textarea' }
+  ],
+  fieldGroups: [
+    { title: '📋 Datos de la incidencia', fields: ['date', 'landId', 'type', 'severity'] },
+    { title: '📝 Descripción y acción', fields: ['description', 'action'] },
+    { title: '👤 Gestión', fields: ['cost', 'responsible', 'status'] },
+    { title: '📝 Notas', fields: ['notes'] }
+  ],
+  transactionType: 'expense'
+};
+
+// ================================================================
+// COSECHAS (HARVESTS) - Unidades: kg, libras, quintales, sacos, toneladas, arrobas, unidades
+// ================================================================
+window.ENTITY_CONFIG.harvests = {
+  label: 'Cosechas', singular: 'Cosecha', icon: '🌾',
+  listFields: ['date', 'landName', 'quantity', 'unit', 'quality'],
+  fields: [
+    { name: 'date', label: 'Fecha de cosecha', type: 'date', required: true },
+    { name: 'landId', label: 'Terreno', type: 'select', optionsFrom: 'lands', required: true },
+    { name: 'quantity', label: 'Cantidad cosechada', type: 'number', step: '0.01', required: true, min: 0 },
+    { name: 'unit', label: 'Unidad de medida', type: 'select', options: ['kg', 'libras', 'quintales', 'sacos', 'toneladas', 'arrobas', 'unidades'], defaultValue: 'kg' },
+    { name: 'quality', label: 'Calidad', type: 'select', options: ['ALTA', 'MEDIA', 'BAJA'], required: true },
+    { name: 'destination', label: 'Destino', type: 'text' },
+    { name: 'estimatedValue', label: 'Valor estimado', type: 'number', step: '0.01', min: 0 },
+    { name: 'notes', label: 'Notas', type: 'textarea' }
+  ],
+  fieldGroups: [
+    { title: '📋 Datos de la cosecha', fields: ['date', 'landId', 'quantity', 'unit'] },
+    { title: '⭐ Calidad y destino', fields: ['quality', 'destination', 'estimatedValue'] },
+    { title: '📝 Notas', fields: ['notes'] }
+  ],
+  transactionType: 'income'
+};
+
+// ================================================================
+// VENTAS (SALES) - Unidades: kg, libras, quintales, sacos, toneladas, arrobas
+// ================================================================
+window.ENTITY_CONFIG.sales = {
+  label: 'Ventas', singular: 'Venta', icon: '💰',
+  listFields: ['date', 'customer', 'quantity', 'unit', 'total', 'paymentStatus'],
+  fields: [
+    { name: 'date', label: 'Fecha de venta', type: 'date', required: true },
+    { name: 'customer', label: 'Cliente', type: 'text', required: true },
+    { name: 'quantity', label: 'Cantidad', type: 'number', step: '0.01', required: true, min: 0 },
+    { name: 'unit', label: 'Unidad de medida', type: 'select', options: ['kg', 'libras', 'quintales', 'sacos', 'toneladas', 'arrobas'], defaultValue: 'kg' },
+    { name: 'price', label: 'Precio por unidad', type: 'number', step: '0.01', min: 0 },
+    { name: 'total', label: 'Total', type: 'number', step: '0.01', required: true, min: 0, calculatedFrom: ['quantity', 'price'], readOnly: true },
+    { name: 'paymentMethod', label: 'Método de pago', type: 'select', options: ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA', 'OTRO'] },
+    { name: 'paymentStatus', label: 'Estado de pago', type: 'select', options: ['COBRADO', 'PENDIENTE', 'PARCIAL'], defaultValue: 'PENDIENTE' },
+    { name: 'landId', label: 'Terreno', type: 'select', optionsFrom: 'lands' },
+    { name: 'partnerId', label: 'Socio responsable', type: 'select', optionsFrom: 'partners' },
+    { name: 'notes', label: 'Notas', type: 'textarea' }
+  ],
+  fieldGroups: [
+    { title: '📋 Datos de la venta', fields: ['date', 'customer', 'quantity', 'unit', 'price', 'total'] },
+    { title: '💳 Pago', fields: ['paymentMethod', 'paymentStatus'] },
+    { title: '📍 Ubicación y responsable', fields: ['landId', 'partnerId'] },
+    { title: '📝 Notas', fields: ['notes'] }
+  ],
+  transactionType: 'income'
+};
+
+// ================================================================
+// BITÁCORA (JOURNAL)
+// ================================================================
+window.ENTITY_CONFIG.journal = {
+  label: 'Bitácora', singular: 'Nota', icon: '📋',
+  listFields: ['date', 'title', 'content'],
+  fields: [
+    { name: 'date', label: 'Fecha', type: 'date', required: true },
+    { name: 'title', label: 'Título', type: 'text', required: true },
+    { name: 'content', label: 'Contenido', type: 'textarea', required: true, rows: 5 },
+    { name: 'notes', label: 'Notas adicionales', type: 'textarea' }
+  ],
+  fieldGroups: [
+    { title: '📋 Información', fields: ['date', 'title'] },
+    { title: '📝 Contenido', fields: ['content'] },
+    { title: '📝 Notas', fields: ['notes'] }
+  ]
+};
+
+// ================================================================
+// USUARIOS (USERS)
+// ================================================================
+window.ENTITY_CONFIG.users = {
+  label: 'Usuarios', singular: 'Usuario', icon: '👥',
+  listFields: ['name', 'email', 'role', 'active'],
+  fields: [
+    { name: 'name', label: 'Nombre', type: 'text', required: true },
+    { name: 'email', label: 'Email', type: 'email', required: true },
+    { name: 'role', label: 'Rol', type: 'select', options: ['SOCIO', 'ADMIN'], defaultValue: 'SOCIO' },
+    { name: 'active', label: 'Activo', type: 'checkbox' }
+  ],
+  fieldGroups: [
+    { title: '👤 Datos del usuario', fields: ['name', 'email'] },
+    { title: '🔐 Permisos', fields: ['role', 'active'] }
+  ]
+};
+
+// ================================================================
+// ARCHIVOS (ATTACHMENTS)
+// ================================================================
+window.ENTITY_CONFIG.attachments = {
+  label: 'Archivos', singular: 'Archivo', icon: '📎',
+  listFields: ['fileName', 'uploadedAt', 'uploadedBy'],
+  fields: []
+};
+
+// ================================================================
+// AUDITORÍA (AUDIT LOGS)
+// ================================================================
+window.ENTITY_CONFIG.auditLogs = {
+  label: 'Auditoría', singular: 'Registro', icon: '🧾',
+  listFields: ['timestamp', 'userName', 'action', 'entity', 'description'],
+  fields: []
+};
+
+// ================================================================
+// CONFIGURACIÓN (APP SETTINGS)
+// ================================================================
+window.ENTITY_CONFIG.appSettings = {
+  label: 'Configuración', singular: 'Configuración', icon: '⚙️',
+  listFields: ['key', 'value', 'description'],
+  fields: [
+    { name: 'key', label: 'Clave', type: 'text', required: true },
+    { name: 'value', label: 'Valor', type: 'text', required: true },
+    { name: 'description', label: 'Descripción', type: 'textarea' }
+  ],
+  fieldGroups: [
+    { title: '⚙️ Configuración', fields: ['key', 'value'] },
+    { title: '📝 Descripción', fields: ['description'] }
+  ]
+};
+
+// ================================================================
+// 5. FUNCIONES DE AUTENTICACIÓN
+// ================================================================
+
+window.login = function(email, password) {
+  return window.auth.signInWithEmailAndPassword(email, password);
+};
+
+window.logout = function() {
+  return window.auth.signOut();
+};
+
+window.resetPassword = function(email) {
+  return window.auth.sendPasswordResetEmail(email);
+};
+
+// ================================================================
+// 6. FUNCIONES DE BASE DE DATOS
+// ================================================================
+
+window.subscribeToEntity = function(entity, callback) {
+  var ref = window.db.ref(entity);
+  return ref.on('value', function(snapshot) {
+    try {
+      callback(snapshot.val() || {});
+    } catch (error) {
+      console.error('Error en callback de ' + entity + ':', error);
+    }
+  });
+};
+
+window.createRecord = async function(entity, data) {
+  var ref = window.db.ref(entity);
+  var newRef = ref.push();
+  var record = {
+    ...data,
+    id: newRef.key,
+    createdAt: firebase.database.ServerValue.TIMESTAMP,
+    updatedAt: firebase.database.ServerValue.TIMESTAMP
+  };
+  await newRef.set(record);
+  return newRef.key;
+};
+
+window.updateRecord = async function(entity, id, data) {
+  var ref = window.db.ref(entity + '/' + id);
+  await ref.update({
+    ...data,
+    updatedAt: firebase.database.ServerValue.TIMESTAMP
+  });
+};
+
+window.softDeleteRecord = async function(entity, id, userId) {
+  var ref = window.db.ref(entity + '/' + id);
+  await ref.update({
+    deleted: true,
+    deletedAt: firebase.database.ServerValue.TIMESTAMP,
+    deletedBy: userId
+  });
+};
+
+window.writeAudit = async function(action, entity, entityId, description, userId, userName) {
+  try {
+    var auditRef = window.db.ref('auditLogs');
+    var newAudit = auditRef.push();
+    await newAudit.set({
+      id: newAudit.key,
+      userId: userId,
+      userName: userName || 'Usuario',
+      action: action,
+      entity: entity,
+      entityId: entityId,
+      description: description,
+      timestamp: firebase.database.ServerValue.TIMESTAMP
+    });
+  } catch (error) {
+    console.warn('Error al escribir auditoría:', error);
+  }
+};
+
+window.onConnectionChange = function(callback) {
+  var connectedRef = window.db.ref('.info/connected');
+  connectedRef.on('value', function(snap) {
+    callback(snap.val() === true);
+  });
+};
+
+// ================================================================
+// 7. ESTADO DE LA APLICACIÓN
+// ================================================================
+
+var state = {
   currentUser: null,
   userProfile: null,
   data: {},
@@ -11,43 +717,17 @@ const state = {
   currentChild: null,
   online: true,
   toastTimer: null,
-  settings: {}
+  settings: {},
+  isInitialized: false
 };
 
 // ================================================================
-// INICIALIZACIÓN
+// 8. UI
 // ================================================================
-document.addEventListener('DOMContentLoaded', function() {
-  initUI();
-  initAuth();
-  initConnectionStatus();
-  initSettings();
-});
 
-// ================================================================
-// CONFIGURACIÓN
-// ================================================================
-async function initSettings() {
-  try {
-    const settingsRef = window.db.ref('appSettings');
-    const snap = await settingsRef.get();
-    const settings = snap.val() || {};
-    state.settings = settings;
-    if (settings.currencySymbol) {
-      window.APP_CONFIG.currencySymbol = settings.currencySymbol;
-    }
-  } catch (error) {
-    console.warn('Error al cargar configuración:', error);
-    state.settings = window.DEFAULT_SETTINGS || {};
-  }
-}
-
-// ================================================================
-// UI
-// ================================================================
 function initUI() {
   // Login
-  const loginForm = document.getElementById('login-form');
+  var loginForm = document.getElementById('login-form');
   if (loginForm) {
     loginForm.addEventListener('submit', function(e) {
       e.preventDefault();
@@ -55,8 +735,7 @@ function initUI() {
       handleLogin(e);
     });
     
-    // Prevenir Enter en inputs
-    const inputs = loginForm.querySelectorAll('input');
+    var inputs = loginForm.querySelectorAll('input');
     inputs.forEach(function(input) {
       input.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
@@ -68,76 +747,67 @@ function initUI() {
     });
   }
   
-  document.getElementById('reset-password').addEventListener('click', handleResetPassword);
-  document.getElementById('logout-btn').addEventListener('click', handleLogout);
-  document.getElementById('fab').addEventListener('click', showQuickMenu);
-  document.getElementById('menu-toggle').addEventListener('click', toggleSidebar);
+  var resetBtn = document.getElementById('reset-password');
+  if (resetBtn) resetBtn.addEventListener('click', handleResetPassword);
   
-  // Modales
-  document.getElementById('modal').addEventListener('click', function(e) {
-    if (e.target.id === 'modal') closeModal();
-  });
-  document.getElementById('quick-menu').addEventListener('click', function(e) {
-    if (e.target.id === 'quick-menu') closeQuickMenu();
-  });
+  var logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
   
-  // Clicks globales
-  document.addEventListener('click', handleGlobalClick);
-}
-
-function toggleSidebar() {
-  const sidebar = document.getElementById('sidebar');
-  const overlay = document.getElementById('sidebar-overlay');
+  var fabBtn = document.getElementById('fab');
+  if (fabBtn) fabBtn.addEventListener('click', showQuickMenu);
   
-  if (!sidebar) return;
+  var menuToggle = document.getElementById('menu-toggle');
+  if (menuToggle) menuToggle.addEventListener('click', toggleSidebar);
   
-  const isOpen = sidebar.classList.contains('open');
-  
-  if (isOpen) {
-    sidebar.classList.remove('open');
-    if (overlay) overlay.classList.remove('visible');
-  } else {
-    sidebar.classList.add('open');
-    // Crear overlay si no existe
-    if (!overlay) {
-      const newOverlay = document.createElement('div');
-      newOverlay.id = 'sidebar-overlay';
-      newOverlay.className = 'sidebar-overlay';
-      newOverlay.addEventListener('click', toggleSidebar);
-      document.body.appendChild(newOverlay);
-    }
-    document.getElementById('sidebar-overlay').classList.add('visible');
+  var modal = document.getElementById('modal');
+  if (modal) {
+    modal.addEventListener('click', function(e) {
+      if (e.target.id === 'modal') closeModal();
+    });
   }
-}
-
-// ================================================================
-// AUTENTICACIÓN
-// ================================================================
-function initAuth() {
-  window.watchAuth(function(user, profile) {
-    if (user && profile) {
-      state.currentUser = user;
-      state.userProfile = profile;
-      state.data = {};
-      showApp();
-      subscribeToAllEntities();
-      renderAll();
-      showToast('Bienvenido, ' + (profile.name || profile.email || 'Usuario'));
-    } else {
-      showLogin();
-    }
-  });
-}
-
-function initConnectionStatus() {
+  
+  var quickMenu = document.getElementById('quick-menu');
+  if (quickMenu) {
+    quickMenu.addEventListener('click', function(e) {
+      if (e.target.id === 'quick-menu') closeQuickMenu();
+    });
+  }
+  
+  document.addEventListener('click', handleGlobalClick);
+  
+  // Conexión
   window.onConnectionChange(function(online) {
     state.online = online;
     updateConnectionStatus();
   });
 }
 
+function toggleSidebar() {
+  var sidebar = document.getElementById('sidebar');
+  var overlay = document.getElementById('sidebar-overlay');
+  if (!sidebar) return;
+  
+  var isOpen = sidebar.classList.contains('open');
+  
+  if (isOpen) {
+    sidebar.classList.remove('open');
+    if (overlay) overlay.classList.remove('visible');
+  } else {
+    sidebar.classList.add('open');
+    if (!overlay) {
+      var newOverlay = document.createElement('div');
+      newOverlay.id = 'sidebar-overlay';
+      newOverlay.className = 'sidebar-overlay';
+      newOverlay.addEventListener('click', toggleSidebar);
+      document.body.appendChild(newOverlay);
+    }
+    var overlayEl = document.getElementById('sidebar-overlay');
+    if (overlayEl) overlayEl.classList.add('visible');
+  }
+}
+
 function updateConnectionStatus() {
-  const el = document.getElementById('connection-status');
+  var el = document.getElementById('connection-status');
   if (el) {
     el.className = 'connection-status ' + (state.online ? 'online' : 'offline');
     el.title = state.online ? 'Conectado' : 'Desconectado';
@@ -145,98 +815,200 @@ function updateConnectionStatus() {
 }
 
 function showLogin() {
-  document.getElementById('login-screen').classList.remove('hidden');
-  document.getElementById('app-screen').classList.add('hidden');
+  var loginScreen = document.getElementById('login-screen');
+  var appScreen = document.getElementById('app-screen');
+  if (loginScreen) loginScreen.classList.remove('hidden');
+  if (appScreen) appScreen.classList.add('hidden');
 }
 
 function showApp() {
-  document.getElementById('login-screen').classList.add('hidden');
-  document.getElementById('app-screen').classList.remove('hidden');
+  var loginScreen = document.getElementById('login-screen');
+  var appScreen = document.getElementById('app-screen');
+  if (loginScreen) loginScreen.classList.add('hidden');
+  if (appScreen) appScreen.classList.remove('hidden');
 }
 
-async function handleLogin(e) {
+// ================================================================
+// 9. AUTENTICACIÓN
+// ================================================================
+
+function initAuth() {
+  if (state.isInitialized) return;
+  state.isInitialized = true;
+  
+  window.auth.onAuthStateChanged(async function(user) {
+    try {
+      if (user) {
+        // Cargar perfil
+        var userRef = window.db.ref('users/' + user.uid);
+        var snap = await userRef.get();
+        var profile = snap.val();
+        
+        if (!profile) {
+          await window.auth.signOut();
+          showLogin();
+          showToast('Usuario no registrado en el sistema.');
+          return;
+        }
+        
+        if (profile.active === false) {
+          await window.auth.signOut();
+          showLogin();
+          showToast('Usuario inactivo. Contacta al administrador.');
+          return;
+        }
+        
+        if (!profile.role) {
+          profile.role = 'SOCIO';
+          await userRef.update({ role: 'SOCIO' });
+        }
+        
+        state.currentUser = user;
+        state.userProfile = profile;
+        state.data = {};
+        
+        showApp();
+        await loadSettings();
+        subscribeToAllEntities();
+        renderAll();
+        showToast('Bienvenido, ' + (profile.name || profile.email || 'Usuario'));
+      } else {
+        state.currentUser = null;
+        state.userProfile = null;
+        showLogin();
+      }
+    } catch (error) {
+      console.error('Error en autenticación:', error);
+      showLogin();
+      showToast('Error al cargar perfil.');
+    }
+  });
+}
+
+async function loadSettings() {
+  try {
+    if (!state.currentUser) {
+      console.warn('No hay usuario autenticado para cargar configuración');
+      state.settings = window.DEFAULT_SETTINGS || {};
+      return;
+    }
+    
+    var settingsRef = window.db.ref('appSettings');
+    var snap = await settingsRef.get();
+    var settings = snap.val() || {};
+    state.settings = settings;
+    if (settings.currencySymbol) {
+      window.APP_CONFIG.currencySymbol = settings.currencySymbol;
+    }
+  } catch (error) {
+    if (error.code === 'PERMISSION_DENIED') {
+      console.warn('Sin permisos para leer configuración, usando valores por defecto');
+    } else {
+      console.error('Error al cargar configuración:', error);
+    }
+    state.settings = window.DEFAULT_SETTINGS || {};
+  }
+}
+
+function handleLogin(e) {
   if (e) {
     e.preventDefault();
     e.stopPropagation();
   }
   
-  const email = document.getElementById('login-email').value.trim();
-  const password = document.getElementById('login-password').value;
-  const errorEl = document.getElementById('login-error');
-  const btn = document.getElementById('login-btn');
-  const btnContent = document.getElementById('login-btn-content');
+  var email = document.getElementById('login-email').value.trim();
+  var password = document.getElementById('login-password').value;
+  var errorEl = document.getElementById('login-error');
+  var btn = document.getElementById('login-btn');
+  var btnContent = document.getElementById('login-btn-content');
   
-  errorEl.textContent = '';
-  errorEl.classList.remove('visible');
+  if (errorEl) {
+    errorEl.textContent = '';
+    errorEl.classList.remove('visible');
+  }
   
   if (!email || !password) {
-    errorEl.textContent = '⚠️ Por favor, completa todos los campos.';
-    errorEl.classList.add('visible');
+    if (errorEl) {
+      errorEl.textContent = '⚠️ Por favor, completa todos los campos.';
+      errorEl.classList.add('visible');
+    }
     return;
   }
   
   if (!email.includes('@') || !email.includes('.')) {
-    errorEl.textContent = '⚠️ Ingresa un correo electrónico válido.';
-    errorEl.classList.add('visible');
+    if (errorEl) {
+      errorEl.textContent = '⚠️ Ingresa un correo electrónico válido.';
+      errorEl.classList.add('visible');
+    }
     return;
   }
   
-  btn.disabled = true;
-  btnContent.innerHTML = '<span class="spinner"></span> Cargando...';
+  if (btn) btn.disabled = true;
+  if (btnContent) btnContent.innerHTML = '<span class="spinner"></span> Cargando...';
   
-  try {
-    await window.login(email, password);
-  } catch (err) {
-    console.error('Login error:', err);
-    let errorMsg = '❌ Error al iniciar sesión.';
-    if (err.code === 'auth/user-not-found') {
-      errorMsg = '❌ Usuario no encontrado. Verifica tu email.';
-    } else if (err.code === 'auth/wrong-password') {
-      errorMsg = '❌ Contraseña incorrecta. Intenta nuevamente.';
-    } else if (err.code === 'auth/too-many-requests') {
-      errorMsg = '⏳ Demasiados intentos. Espera unos minutos.';
-    } else if (err.code === 'auth/invalid-email') {
-      errorMsg = '❌ Email inválido. Verifica el formato.';
-    } else if (err.code === 'auth/user-disabled') {
-      errorMsg = '🚫 Usuario desactivado. Contacta al administrador.';
-    }
-    errorEl.textContent = errorMsg;
-    errorEl.classList.add('visible');
-    btn.disabled = false;
-    btnContent.innerHTML = '<span class="btn-icon">🚀</span> Entrar';
-  }
+  window.login(email, password)
+    .catch(function(err) {
+      console.error('Login error:', err);
+      var errorMsg = '❌ Error al iniciar sesión.';
+      if (err.code === 'auth/user-not-found') {
+        errorMsg = '❌ Usuario no encontrado. Verifica tu email.';
+      } else if (err.code === 'auth/wrong-password') {
+        errorMsg = '❌ Contraseña incorrecta. Intenta nuevamente.';
+      } else if (err.code === 'auth/too-many-requests') {
+        errorMsg = '⏳ Demasiados intentos. Espera unos minutos.';
+      } else if (err.code === 'auth/invalid-email') {
+        errorMsg = '❌ Email inválido. Verifica el formato.';
+      } else if (err.code === 'auth/user-disabled') {
+        errorMsg = '🚫 Usuario desactivado. Contacta al administrador.';
+      } else if (err.code === 'auth/network-request-failed') {
+        errorMsg = '⚠️ Error de red. Verifica tu conexión a internet.';
+      }
+      if (errorEl) {
+        errorEl.textContent = errorMsg;
+        errorEl.classList.add('visible');
+      }
+      if (btn) btn.disabled = false;
+      if (btnContent) btnContent.innerHTML = '<span class="btn-icon">🚀</span> Entrar';
+    });
 }
 
-async function handleResetPassword() {
-  const email = document.getElementById('login-email').value.trim();
+function handleResetPassword() {
+  var email = document.getElementById('login-email').value.trim();
   if (!email) {
     showToast('Introduce tu email primero.');
     return;
   }
-  try {
-    await window.resetPassword(email);
-    showToast('Correo de recuperación enviado.');
-  } catch (err) {
-    console.error('Reset password error:', err);
-    showToast('Error al enviar el correo de recuperación.');
-  }
+  window.resetPassword(email)
+    .then(function() {
+      showToast('Correo de recuperación enviado.');
+    })
+    .catch(function(err) {
+      console.error('Reset password error:', err);
+      if (err.code === 'auth/user-not-found') {
+        showToast('No existe un usuario con ese email.');
+      } else {
+        showToast('Error al enviar el correo de recuperación.');
+      }
+    });
 }
 
-async function handleLogout() {
-  try {
-    await window.logout();
-    showToast('Sesión cerrada correctamente.');
-  } catch (err) {
-    console.error('Logout error:', err);
-    showToast('Error al cerrar sesión.');
-  }
+function handleLogout() {
+  window.logout()
+    .then(function() {
+      showToast('Sesión cerrada correctamente.');
+    })
+    .catch(function(err) {
+      console.error('Logout error:', err);
+      showToast('Error al cerrar sesión.');
+    });
 }
 
 // ================================================================
-// DATOS Y SUSCRIPCIONES
+// 10. DATOS Y SUSCRIPCIONES
 // ================================================================
+
 function subscribeToAllEntities() {
-  const entities = [
+  var entities = [
     'users', 'projects', 'lands', 'expenses', 'contributions', 'workers',
     'workLogs', 'seeds', 'agriculturalProducts', 'cropActivities',
     'incidents', 'harvests', 'sales', 'journal', 'attachments', 'auditLogs',
@@ -252,8 +1024,9 @@ function subscribeToAllEntities() {
 }
 
 // ================================================================
-// RENDER PRINCIPAL
+// 11. RENDER PRINCIPAL
 // ================================================================
+
 function renderAll() {
   renderNavigation();
   renderCurrentView();
@@ -261,8 +1034,8 @@ function renderAll() {
 }
 
 function updateUserBadge() {
-  const nameEl = document.getElementById('user-name');
-  const avatarEl = document.getElementById('user-avatar');
+  var nameEl = document.getElementById('user-name');
+  var avatarEl = document.getElementById('user-avatar');
   if (nameEl && state.userProfile) {
     nameEl.textContent = state.userProfile.name || state.userProfile.email || 'Usuario';
   }
@@ -272,15 +1045,14 @@ function updateUserBadge() {
 }
 
 function renderNavigation() {
-  const sidebar = document.getElementById('sidebar');
-  const bottomNav = document.getElementById('bottom-nav');
+  var sidebar = document.getElementById('sidebar');
+  var bottomNav = document.getElementById('bottom-nav');
   if (!sidebar || !bottomNav) return;
 
-  let sidebarHtml = '';
-  let bottomHtml = '';
+  var sidebarHtml = '';
+  var bottomHtml = '';
 
   window.NAV_SECTIONS.forEach(function(section) {
-    // Sidebar
     if (section.type === 'group') {
       sidebarHtml += '<div class="nav-section">';
       sidebarHtml += '<div class="nav-section-title">' + section.icon + ' ' + section.label + '</div>';
@@ -303,7 +1075,6 @@ function renderNavigation() {
       sidebarHtml += '</a>';
     }
 
-    // Bottom Nav (solo items principales)
     bottomHtml += '<button class="nav-btn ' + active + '" data-section="' + section.id + '">';
     bottomHtml += '<span class="nav-icon">' + section.icon + '</span>';
     bottomHtml += '<span class="nav-label">' + section.label + '</span>';
@@ -315,12 +1086,11 @@ function renderNavigation() {
 }
 
 function renderCurrentView() {
-  const main = document.getElementById('main-content');
+  var main = document.getElementById('main-content');
   if (!main) return;
 
   var section = null;
 
-  // Buscar en la navegación
   for (var i = 0; i < window.NAV_SECTIONS.length; i++) {
     var navSection = window.NAV_SECTIONS[i];
     if (navSection.id === state.currentSection) {
@@ -344,20 +1114,25 @@ function renderCurrentView() {
 
   var content = '';
   
-  if (section.type === 'dashboard' || section.id === 'dashboard') {
-    content = renderDashboard();
-  } else if (section.type === 'list' || section.entity) {
-    content = renderList(section.entity || section.id);
-  } else if (section.type === 'group') {
-    if (section.children && section.children.length > 0) {
-      content = renderGroup(section);
+  try {
+    if (section.type === 'dashboard' || section.id === 'dashboard') {
+      content = renderDashboard();
+    } else if (section.type === 'list' || section.entity) {
+      content = renderList(section.entity || section.id);
+    } else if (section.type === 'group') {
+      if (section.children && section.children.length > 0) {
+        content = renderGroup(section);
+      } else {
+        content = '<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">Sin elementos</div></div>';
+      }
+    } else if (section.type === 'config' || section.id === 'configuracion') {
+      content = renderConfig();
     } else {
-      content = '<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">Sin elementos</div></div>';
+      content = '<div class="empty-state"><div class="empty-icon">🚧</div><div class="empty-title">En construcción</div></div>';
     }
-  } else if (section.type === 'config' || section.id === 'configuracion') {
-    content = renderConfig();
-  } else {
-    content = '<div class="empty-state"><div class="empty-icon">🚧</div><div class="empty-title">En construcción</div></div>';
+  } catch (error) {
+    console.error('Error al renderizar:', error);
+    content = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Error al cargar</div><div class="empty-desc">' + error.message + '</div></div>';
   }
 
   main.innerHTML = content;
@@ -366,102 +1141,123 @@ function renderCurrentView() {
 }
 
 // ================================================================
-// DASHBOARD MEJORADO
+// 12. DASHBOARD
 // ================================================================
+
 function renderDashboard() {
-  // Calcular totales
-  var expenses = sumEntity('expenses', 'amount');
-  var contributions = sumEntity('contributions', 'amount');
-  var sales = sumEntity('sales', 'total');
-  var seedsTotal = sumEntity('seeds', 'total');
-  var productsTotal = sumEntity('agriculturalProducts', 'total');
-  var workLogsTotal = sumEntity('workLogs', 'amount');
-  var activitiesCost = sumEntity('cropActivities', 'cost');
-  var incidentsCost = sumEntity('incidents', 'cost');
-  var harvestKg = sumEntity('harvests', 'quantity');
-  var salesKg = sumEntity('sales', 'quantity');
-  
-  var totalExpenses = expenses + seedsTotal + productsTotal + workLogsTotal + activitiesCost + incidentsCost;
-  var totalIncome = contributions + sales;
-  var resultado = totalIncome - totalExpenses;
-  var totalPartners = Object.values(state.data.partners || {}).filter(function(p) { return !p.deleted && p.status === 'ACTIVO'; }).length;
+  try {
+    var expenses = sumEntity('expenses', 'amount');
+    var contributions = sumEntity('contributions', 'amount');
+    var sales = sumEntity('sales', 'total');
+    var seedsTotal = sumEntity('seeds', 'total');
+    var productsTotal = sumEntity('agriculturalProducts', 'total');
+    var workLogsTotal = sumEntity('workLogs', 'amount');
+    var activitiesCost = sumEntity('cropActivities', 'cost');
+    var incidentsCost = sumEntity('incidents', 'cost');
+    var harvestKg = sumEntity('harvests', 'quantity');
+    var salesKg = sumEntity('sales', 'quantity');
+    
+    var totalExpenses = expenses + seedsTotal + productsTotal + workLogsTotal + activitiesCost + incidentsCost;
+    var totalIncome = contributions + sales;
+    var resultado = totalIncome - totalExpenses;
+    var totalPartners = 0;
+    
+    var partnersData = state.data.partners || {};
+    totalPartners = Object.values(partnersData).filter(function(p) { return !p.deleted && p.status === 'ACTIVO'; }).length;
 
-  var alerts = computeAlerts();
-  var recent = getRecentActivity(5);
+    var alerts = computeAlerts();
+    var recent = getRecentActivity(5);
 
-  return `
-    <div class="dashboard animate-fade-in">
-      <div class="page-header">
-        <h1 class="page-title">📊 Panel de Control</h1>
-        <p class="page-subtitle">Resumen general del proyecto agrícola</p>
-      </div>
+    return `
+      <div class="dashboard animate-fade-in">
+        <div class="page-header">
+          <h1 class="page-title">📊 Panel de Control</h1>
+          <p class="page-subtitle">Resumen general del proyecto agrícola</p>
+        </div>
 
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-label"><span class="label-icon">👥</span> Socios activos</div>
-          <div class="stat-value">${totalPartners}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label"><span class="label-icon">🏦</span> Capital aportado</div>
-          <div class="stat-value">${window.formatMoney(contributions)}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label"><span class="label-icon">💸</span> Gastos totales</div>
-          <div class="stat-value">${window.formatMoney(totalExpenses)}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label"><span class="label-icon">💰</span> Ingresos totales</div>
-          <div class="stat-value">${window.formatMoney(totalIncome)}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label"><span class="label-icon">📊</span> Resultado</div>
-          <div class="stat-value">${window.formatMoney(resultado)}</div>
-          <div class="stat-change ${resultado >= 0 ? 'up' : 'down'}">${resultado >= 0 ? '📈' : '📉'} ${resultado >= 0 ? 'Positivo' : 'Negativo'}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label"><span class="label-icon">🌾</span> Producción</div>
-          <div class="stat-value">${harvestKg} kg</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label"><span class="label-icon">📦</span> Kg vendidos</div>
-          <div class="stat-value">${salesKg} kg</div>
-        </div>
-      </div>
-
-      <div class="alerts-section">
-        <div class="section-header">
-          <div class="section-title"><span class="title-icon">⚠️</span> Alertas</div>
-          <span class="alert-count">${alerts.length}</span>
-        </div>
-        ${alerts.length ? alerts.map(function(a) { return `
-          <div class="alert-item ${a.type}">
-            <span class="alert-icon">${a.icon}</span>
-            <div class="alert-content">
-              <div class="alert-message">${a.message}</div>
-            </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label"><span class="label-icon">👥</span> Socios activos</div>
+            <div class="stat-value">${totalPartners}</div>
           </div>
-        `; }).join('') : '<div class="empty-state" style="padding:1rem;"><div class="empty-icon">✅</div><div class="empty-title" style="font-size:0.9rem;">Sin alertas activas</div></div>'}
-      </div>
-
-      <div class="recent-section">
-        <div class="section-title"><span class="title-icon">📋</span> Actividad reciente</div>
-        ${recent.length ? recent.map(function(log) { return `
-          <div class="recent-item">
-            <span class="recent-icon">📝</span>
-            <div class="recent-content">
-              <div class="recent-text">${window.escapeHtml(log.description)}</div>
-              <div class="recent-time">${window.formatDateTime(log.timestamp)}</div>
-            </div>
+          <div class="stat-card">
+            <div class="stat-label"><span class="label-icon">🏦</span> Capital aportado</div>
+            <div class="stat-value">${safeFormatMoney(contributions)}</div>
           </div>
-        `; }).join('') : '<div class="empty-state" style="padding:1rem;"><div class="empty-icon">📭</div><div class="empty-title" style="font-size:0.9rem;">Sin actividad reciente</div></div>'}
+          <div class="stat-card">
+            <div class="stat-label"><span class="label-icon">💸</span> Gastos totales</div>
+            <div class="stat-value">${safeFormatMoney(totalExpenses)}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label"><span class="label-icon">💰</span> Ingresos totales</div>
+            <div class="stat-value">${safeFormatMoney(totalIncome)}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label"><span class="label-icon">📊</span> Resultado</div>
+            <div class="stat-value">${safeFormatMoney(resultado)}</div>
+            <div class="stat-change ${resultado >= 0 ? 'up' : 'down'}">${resultado >= 0 ? '📈' : '📉'} ${resultado >= 0 ? 'Positivo' : 'Negativo'}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label"><span class="label-icon">🌾</span> Producción</div>
+            <div class="stat-value">${harvestKg} kg</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label"><span class="label-icon">📦</span> Kg vendidos</div>
+            <div class="stat-value">${salesKg} kg</div>
+          </div>
+        </div>
+
+        <div class="alerts-section">
+          <div class="section-header">
+            <div class="section-title"><span class="title-icon">⚠️</span> Alertas</div>
+            <span class="alert-count">${alerts.length}</span>
+          </div>
+          ${alerts.length ? alerts.map(function(a) { return `
+            <div class="alert-item ${a.type}">
+              <span class="alert-icon">${a.icon}</span>
+              <div class="alert-content">
+                <div class="alert-message">${a.message}</div>
+              </div>
+            </div>
+          `; }).join('') : '<div class="empty-state" style="padding:1rem;"><div class="empty-icon">✅</div><div class="empty-title" style="font-size:0.9rem;">Sin alertas activas</div></div>'}
+        </div>
+
+        <div class="recent-section">
+          <div class="section-title"><span class="title-icon">📋</span> Actividad reciente</div>
+          ${recent.length ? recent.map(function(log) { return `
+            <div class="recent-item">
+              <span class="recent-icon">📝</span>
+              <div class="recent-content">
+                <div class="recent-text">${window.escapeHtml(log.description)}</div>
+                <div class="recent-time">${window.formatDateTime(log.timestamp)}</div>
+              </div>
+            </div>
+          `; }).join('') : '<div class="empty-state" style="padding:1rem;"><div class="empty-icon">📭</div><div class="empty-title" style="font-size:0.9rem;">Sin actividad reciente</div></div>'}
+        </div>
       </div>
-    </div>
-  `;
+    `;
+  } catch (error) {
+    console.error('Error en renderDashboard:', error);
+    return '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Error al cargar el dashboard</div></div>';
+  }
+}
+
+function safeFormatMoney(value) {
+  try {
+    return window.formatMoney(value);
+  } catch (e) {
+    console.warn('Error formateando moneda:', e);
+    return '$0.00';
+  }
 }
 
 function sumEntity(entity, field) {
-  var records = Object.values(state.data[entity] || {}).filter(function(r) { return !r.deleted; });
-  return records.reduce(function(sum, r) { return sum + (Number(r[field]) || 0); }, 0);
+  try {
+    var records = Object.values(state.data[entity] || {}).filter(function(r) { return !r.deleted; });
+    return records.reduce(function(sum, r) { return sum + (Number(r[field]) || 0); }, 0);
+  } catch (e) {
+    return 0;
+  }
 }
 
 function computeAlerts() {
@@ -469,35 +1265,49 @@ function computeAlerts() {
   var now = Date.now();
   var in30Days = now + 30 * 24 * 60 * 60 * 1000;
 
-  Object.values(state.data.lands || {}).filter(function(l) { return !l.deleted && l.status === 'ACTIVO'; }).forEach(function(land) {
-    if (land.rentalEnd && new Date(land.rentalEnd).getTime() < in30Days) {
-      alerts.push({ type: 'alert-warning', icon: '⚠️', message: 'Alquiler próximo a vencer: ' + land.name });
-    }
-  });
+  try {
+    var lands = state.data.lands || {};
+    Object.values(lands).filter(function(l) { return !l.deleted && l.status === 'ACTIVO'; }).forEach(function(land) {
+      if (land.rentalEnd && new Date(land.rentalEnd).getTime() < in30Days) {
+        alerts.push({ type: 'alert-warning', icon: '⚠️', message: 'Alquiler próximo a vencer: ' + land.name });
+      }
+    });
+  } catch (e) {}
 
-  Object.values(state.data.incidents || {}).filter(function(i) { return !i.deleted && i.status !== 'RESOLVED'; }).forEach(function(inc) {
-    alerts.push({ type: 'alert-danger', icon: '🚨', message: 'Incidencia abierta: ' + (inc.description || '').substring(0, 40) });
-  });
+  try {
+    var incidents = state.data.incidents || {};
+    Object.values(incidents).filter(function(i) { return !i.deleted && i.status !== 'RESOLVED'; }).forEach(function(inc) {
+      alerts.push({ type: 'alert-danger', icon: '🚨', message: 'Incidencia abierta: ' + (inc.description || '').substring(0, 40) });
+    });
+  } catch (e) {}
 
-  Object.values(state.data.sales || {}).filter(function(s) { return !s.deleted && s.paymentStatus !== 'COBRADO'; }).forEach(function(sale) {
-    alerts.push({ type: 'alert-warning', icon: '💳', message: 'Venta pendiente de cobro: ' + (sale.customer || 'Cliente') + ' - ' + window.formatMoney(sale.total || 0) });
-  });
+  try {
+    var sales = state.data.sales || {};
+    Object.values(sales).filter(function(s) { return !s.deleted && s.paymentStatus !== 'COBRADO'; }).forEach(function(sale) {
+      alerts.push({ type: 'alert-warning', icon: '💳', message: 'Venta pendiente de cobro: ' + (sale.customer || 'Cliente') + ' - ' + safeFormatMoney(sale.total || 0) });
+    });
+  } catch (e) {}
 
   return alerts;
 }
 
 function getRecentActivity(limit) {
   limit = limit || 5;
-  var logs = Object.values(state.data.auditLogs || {})
-    .filter(function(l) { return l.timestamp; })
-    .sort(function(a, b) { return (b.timestamp || 0) - (a.timestamp || 0); })
-    .slice(0, limit);
-  return logs;
+  try {
+    var logs = Object.values(state.data.auditLogs || {})
+      .filter(function(l) { return l.timestamp; })
+      .sort(function(a, b) { return (b.timestamp || 0) - (a.timestamp || 0); })
+      .slice(0, limit);
+    return logs;
+  } catch (e) {
+    return [];
+  }
 }
 
 // ================================================================
-// LISTAS
+// 13. LISTAS
 // ================================================================
+
 function renderList(entity) {
   var config = window.ENTITY_CONFIG[entity];
   if (!config) return '<div class="empty-state"><div class="empty-icon">❌</div><div class="empty-title">Entidad no configurada</div></div>';
@@ -548,7 +1358,6 @@ function renderList(entity) {
         var value = record[fieldName];
         if (value === undefined || value === null) return;
 
-        // Relaciones
         if (field && field.optionsFrom === 'lands') {
           var land = state.data.lands ? state.data.lands[value] : null;
           html += '<span class="item-text">' + window.escapeHtml(land ? land.name || value : value) + '</span>';
@@ -565,11 +1374,10 @@ function renderList(entity) {
           return;
         }
 
-        // Tipos
         if (field && field.type === 'date' && value) {
           html += '<span class="item-date">' + window.formatDate(value) + '</span>';
         } else if (field && (field.type === 'number' || fieldName.match(/amount|cost|price|total|rate|capital|rentalCost|contributionAmount/))) {
-          html += '<span class="item-number">' + window.formatMoney(value) + '</span>';
+          html += '<span class="item-number">' + safeFormatMoney(value) + '</span>';
         } else if (field && field.type === 'checkbox') {
           html += '<span class="item-text">' + (value ? '✅' : '❌') + '</span>';
         } else if (field && field.type === 'select') {
@@ -615,8 +1423,9 @@ function renderGroup(section) {
 }
 
 // ================================================================
-// USUARIOS, ARCHIVOS, AUDITORÍA
+// 14. USUARIOS, ARCHIVOS, AUDITORÍA
 // ================================================================
+
 function renderUsers() {
   if (state.userProfile && state.userProfile.role !== 'ADMIN') {
     return '<div class="empty-state"><div class="empty-icon">🚫</div><div class="empty-title">Sin permisos</div><div class="empty-desc">No tienes permiso para ver usuarios.</div></div>';
@@ -745,8 +1554,9 @@ function renderAuditLogs() {
 }
 
 // ================================================================
-// CONFIGURACIÓN
+// 15. CONFIGURACIÓN
 // ================================================================
+
 function renderConfig() {
   if (state.userProfile && state.userProfile.role !== 'ADMIN') {
     return '<div class="empty-state"><div class="empty-icon">🚫</div><div class="empty-title">Sin permisos</div><div class="empty-desc">No tienes permiso para acceder a la configuración.</div></div>';
@@ -827,7 +1637,7 @@ async function saveConfig() {
     taxRate: parseFloat(document.getElementById('config-tax').value) || 0,
     defaultProject: document.getElementById('config-project').value.trim() || 'malanga-2026',
     updatedAt: firebase.database.ServerValue.TIMESTAMP,
-    updatedBy: state.currentUser.uid
+    updatedBy: state.currentUser ? state.currentUser.uid : null
   };
 
   try {
@@ -861,7 +1671,7 @@ async function resetConfig() {
     await settingsRef.update({
       ...settings,
       updatedAt: firebase.database.ServerValue.TIMESTAMP,
-      updatedBy: state.currentUser.uid
+      updatedBy: state.currentUser ? state.currentUser.uid : null
     });
     state.settings = settings;
     window.APP_CONFIG.currencySymbol = settings.currencySymbol;
@@ -874,72 +1684,8 @@ async function resetConfig() {
 }
 
 // ================================================================
-// FORMULARIOS CON CÁLCULOS AUTOMÁTICOS
+// 16. FORMULARIOS
 // ================================================================
-
-// Función para actualizar campos calculados en tiempo real
-window.updateCalculatedFields = function(entity, form) {
-  var config = window.ENTITY_CONFIG[entity];
-  if (!config || !config.fields) return;
-
-  config.fields.forEach(function(field) {
-    if (field.calculatedFrom && field.calculatedFrom.length > 0) {
-      var targetInput = form.querySelector('[name="' + field.name + '"]');
-      if (!targetInput) return;
-
-      // Obtener valores de los campos origen
-      var values = field.calculatedFrom.map(function(srcName) {
-        var input = form.querySelector('[name="' + srcName + '"]');
-        if (!input) return 0;
-        var val = parseFloat(input.value) || 0;
-        return val;
-      });
-
-      // Calcular el resultado (multiplicación)
-      var result = values.reduce(function(acc, val) { return acc * val; }, 1);
-
-      // Si es moneda, formatear con 2 decimales
-      var isMoney = field.name === 'amount' || field.name === 'total' || field.name === 'cost';
-      if (isMoney) {
-        targetInput.value = result.toFixed(2);
-      } else {
-        targetInput.value = result;
-      }
-    }
-  });
-};
-
-// Función para vincular eventos de cálculo automático
-window.bindAutoCalculations = function(entity, form) {
-  var config = window.ENTITY_CONFIG[entity];
-  if (!config || !config.fields) return;
-
-  var calculatedFields = config.fields.filter(function(f) { return f.calculatedFrom && f.calculatedFrom.length > 0; });
-  if (calculatedFields.length === 0) return;
-
-  var sourceFields = [];
-  calculatedFields.forEach(function(f) {
-    f.calculatedFrom.forEach(function(src) {
-      if (sourceFields.indexOf(src) === -1) sourceFields.push(src);
-    });
-  });
-
-  sourceFields.forEach(function(fieldName) {
-    var input = form.querySelector('[name="' + fieldName + '"]');
-    if (!input) return;
-
-    var update = function() {
-      window.updateCalculatedFields(entity, form);
-    };
-
-    input.addEventListener('input', update);
-    input.addEventListener('change', update);
-    input.addEventListener('keyup', update);
-  });
-
-  // Ejecutar cálculo inicial
-  window.updateCalculatedFields(entity, form);
-};
 
 function showForm(entity, record) {
   record = record || null;
@@ -976,7 +1722,6 @@ function showForm(entity, record) {
   
   form.addEventListener('submit', function(e) {
     e.preventDefault();
-    // Actualizar cálculos antes de enviar
     window.updateCalculatedFields(entity, form);
     handleFormSubmit(entity, record);
   });
@@ -984,7 +1729,6 @@ function showForm(entity, record) {
   modal.querySelector('[data-dismiss]').addEventListener('click', closeModal);
   modal.querySelector('.modal-close').addEventListener('click', closeModal);
   
-  // Vincular cálculos automáticos después de mostrar el formulario
   setTimeout(function() {
     window.bindAutoCalculations(entity, form);
   }, 100);
@@ -1071,7 +1815,6 @@ async function handleFormSubmit(entity, record) {
   var config = window.ENTITY_CONFIG[entity];
   var form = document.getElementById('entity-form');
   
-  // Actualizar cálculos automáticos antes de recopilar datos
   window.updateCalculatedFields(entity, form);
   
   var formData = new FormData(form);
@@ -1096,13 +1839,13 @@ async function handleFormSubmit(entity, record) {
   var now = firebase.database.ServerValue.TIMESTAMP;
 
   if (!record) {
-    data.createdBy = state.currentUser.uid;
+    data.createdBy = state.currentUser ? state.currentUser.uid : null;
     data.createdAt = now;
     data.updatedAt = now;
   } else {
-    data.updatedBy = state.currentUser.uid;
+    data.updatedBy = state.currentUser ? state.currentUser.uid : null;
     data.updatedAt = now;
-    data.createdBy = record.createdBy || state.currentUser.uid;
+    data.createdBy = record.createdBy || (state.currentUser ? state.currentUser.uid : null);
   }
 
   if (entity === 'contributions' && data.partnerId) {
@@ -1117,12 +1860,12 @@ async function handleFormSubmit(entity, record) {
     if (record) {
       await window.updateRecord(entity, record.id, data);
       id = record.id;
-      await window.writeAudit('update', entity, id, 'Modificó ' + config.singular.toLowerCase(), state.currentUser.uid, state.userProfile.name || state.userProfile.email);
+      await window.writeAudit('update', entity, id, 'Modificó ' + config.singular.toLowerCase(), state.currentUser ? state.currentUser.uid : null, state.userProfile ? state.userProfile.name || state.userProfile.email : 'Usuario');
       showToast('✅ Registro actualizado correctamente');
     } else {
-      data.createdBy = state.currentUser.uid;
+      data.createdBy = state.currentUser ? state.currentUser.uid : null;
       id = await window.createRecord(entity, data);
-      await window.writeAudit('create', entity, id, 'Creó ' + config.singular.toLowerCase(), state.currentUser.uid, state.userProfile.name || state.userProfile.email);
+      await window.writeAudit('create', entity, id, 'Creó ' + config.singular.toLowerCase(), state.currentUser ? state.currentUser.uid : null, state.userProfile ? state.userProfile.name || state.userProfile.email : 'Usuario');
       showToast('✅ Registro creado correctamente');
     }
     closeModal();
@@ -1137,9 +1880,9 @@ function confirmDelete(entity, id) {
   var config = window.ENTITY_CONFIG[entity];
   if (!confirm('¿Seguro que deseas eliminar este ' + config.singular.toLowerCase() + '?')) return;
 
-  window.softDeleteRecord(entity, id, state.currentUser.uid)
+  window.softDeleteRecord(entity, id, state.currentUser ? state.currentUser.uid : null)
     .then(async function() {
-      await window.writeAudit('delete', entity, id, 'Eliminó ' + config.singular.toLowerCase(), state.currentUser.uid, state.userProfile.name || state.userProfile.email);
+      await window.writeAudit('delete', entity, id, 'Eliminó ' + config.singular.toLowerCase(), state.currentUser ? state.currentUser.uid : null, state.userProfile ? state.userProfile.name || state.userProfile.email : 'Usuario');
       showToast('✅ Registro eliminado');
       renderCurrentView();
     })
@@ -1150,11 +1893,12 @@ function confirmDelete(entity, id) {
 }
 
 // ================================================================
-// ACCIONES DE USUARIOS
+// 17. ACCIONES DE USUARIOS
 // ================================================================
+
 async function toggleUserRole(uid, newRole) {
   try {
-    await window.updateRecord('users', uid, { role: newRole, updatedBy: state.currentUser.uid });
+    await window.updateRecord('users', uid, { role: newRole, updatedBy: state.currentUser ? state.currentUser.uid : null });
     showToast('✅ Rol actualizado a ' + newRole);
     renderCurrentView();
   } catch (err) {
@@ -1165,7 +1909,7 @@ async function toggleUserRole(uid, newRole) {
 
 async function toggleUserActive(uid, active) {
   try {
-    await window.updateRecord('users', uid, { active: active === 'true' || active === true, updatedBy: state.currentUser.uid });
+    await window.updateRecord('users', uid, { active: active === 'true' || active === true, updatedBy: state.currentUser ? state.currentUser.uid : null });
     showToast(active ? '✅ Usuario activado' : '✅ Usuario desactivado');
     renderCurrentView();
   } catch (err) {
@@ -1175,8 +1919,9 @@ async function toggleUserActive(uid, active) {
 }
 
 // ================================================================
-// UTILIDADES UI
+// 18. UTILIDADES UI
 // ================================================================
+
 function bindListSearch() {
   var searchInput = document.querySelector('[data-search-list]');
   if (!searchInput) return;
@@ -1227,7 +1972,6 @@ function handleGlobalClick(e) {
 
     renderNavigation();
     renderCurrentView();
-    // Cerrar sidebar en móvil
     var sidebar = document.getElementById('sidebar');
     if (sidebar && sidebar.classList.contains('open')) {
       toggleSidebar();
@@ -1293,15 +2037,18 @@ function showQuickMenu() {
 }
 
 function closeModal() {
-  document.getElementById('modal').classList.add('hidden');
+  var modal = document.getElementById('modal');
+  if (modal) modal.classList.add('hidden');
 }
 
 function closeQuickMenu() {
-  document.getElementById('quick-menu').classList.add('hidden');
+  var modal = document.getElementById('quick-menu');
+  if (modal) modal.classList.add('hidden');
 }
 
 function showToast(message) {
   var toast = document.getElementById('toast');
+  if (!toast) return;
   toast.textContent = message;
   toast.className = 'toast';
   toast.classList.remove('hidden');
@@ -1312,8 +2059,9 @@ function showToast(message) {
 }
 
 // ================================================================
-// CLOUDINARY UPLOAD
+// 19. CLOUDINARY UPLOAD
 // ================================================================
+
 async function uploadAttachment(file) {
   var config = window.CLOUDINARY_CONFIG;
   if (!config.cloudName || config.cloudName === 'TU_CLOUD_NAME') {
@@ -1349,7 +2097,7 @@ async function uploadAttachment(file) {
           resourceType: response.resource_type,
           fileName: file.name,
           fileSize: file.size,
-          uploadedBy: state.currentUser.uid,
+          uploadedBy: state.currentUser ? state.currentUser.uid : null,
           uploadedAt: firebase.database.ServerValue.TIMESTAMP,
           projectId: window.APP_CONFIG.defaultProjectId
         });
@@ -1374,8 +2122,9 @@ async function uploadAttachment(file) {
 }
 
 // ================================================================
-// EVENTOS DE UPLOAD
+// 20. EVENTOS DE UPLOAD
 // ================================================================
+
 document.addEventListener('click', function(e) {
   if (e.target.id === 'upload-attachment-btn') {
     var fileInput = document.getElementById('attachment-file');
@@ -1396,3 +2145,18 @@ document.addEventListener('click', function(e) {
     uploadAttachment(file);
   }
 });
+
+// ================================================================
+// 21. INICIALIZACIÓN FINAL
+// ================================================================
+
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('🌱 Malanga v2.1.0 - Iniciando...');
+  initUI();
+  initAuth();
+  console.log('✅ Aplicación inicializada correctamente');
+});
+
+console.log('🔥 Firebase inicializado correctamente');
+console.log('✅ formatMoney disponible:', typeof window.formatMoney === 'function');
+console.log('✅ ENTITY_CONFIG cargado:', Object.keys(window.ENTITY_CONFIG).length, 'entidades');
