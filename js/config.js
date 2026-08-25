@@ -1,529 +1,183 @@
 // ================================================================
-// CONFIGURACIÓN GLOBAL DE LA APLICACIÓN MALANGA
+// FUNCIONES DE UTILIDAD
 // ================================================================
 
-// Configuración de Firebase
-window.FIREBASE_CONFIG = {
-  apiKey: "AIzaSyBI4O0d_Mec38FDiuhirujCnX99PFKiXW4",
-  authDomain: "projekt-pc.firebaseapp.com",
-  databaseURL: "https://projekt-pc-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "projekt-pc",
-  storageBucket: "projekt-pc.appspot.com",
-  messagingSenderId: "90098431634",
-  appId: "1:90098431634:web:7cb61800d03533c2a6984b"
+// Formatear fecha
+window.formatDate = function(ts) {
+  if (!ts) return '';
+  const date = new Date(ts);
+  return date.toLocaleDateString('es-ES', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
 };
 
-// Configuración de Cloudinary
-window.CLOUDINARY_CONFIG = {
-  cloudName: "TU_CLOUD_NAME",
-  uploadPreset: "logistica",
-  folder: "malanga"
+// Formatear fecha y hora
+window.formatDateTime = function(ts) {
+  if (!ts) return '';
+  const date = new Date(ts);
+  return date.toLocaleString('es-ES', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 };
 
-// Configuración general de la aplicación
-window.APP_CONFIG = {
-  currency: "USD",
-  currencySymbol: "$",
-  defaultProjectId: "malanga-2026",
-  appName: "Malanga - Gestión Agrícola",
-  version: "2.1.0"
+// Formatear número como moneda
+window.formatMoney = function(amount) {
+  if (amount === undefined || amount === null || isNaN(amount)) return '';
+  const symbol = window.APP_CONFIG?.currencySymbol || '$';
+  return symbol + Number(amount).toLocaleString('es-ES', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
+// Escapar HTML para seguridad
+window.escapeHtml = function(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+};
+
+// Obtener fecha de hoy en formato ISO
+window.todayISO = function() {
+  return new Date().toISOString().split('T')[0];
+};
+
+// Debounce para evitar múltiples llamadas
+window.debounce = function(fn, delay) {
+  delay = delay || 300;
+  let timer;
+  return function() {
+    var args = arguments;
+    var context = this;
+    clearTimeout(timer);
+    timer = setTimeout(function() {
+      fn.apply(context, args);
+    }, delay);
+  };
 };
 
 // ================================================================
-// NAVEGACIÓN PRINCIPAL - ESTRUCTURA COMPLETA
+// CÁLCULOS AUTOMÁTICOS EN FORMULARIOS
 // ================================================================
-window.NAV_SECTIONS = [
-  {
-    id: 'dashboard',
-    label: 'Inicio',
-    icon: '🏠',
-    type: 'dashboard'
-  },
-  {
-    id: 'partners',
-    label: 'Socios',
-    icon: '👥',
-    type: 'list',
-    entity: 'partners'
-  },
-  {
-    id: 'finanzas',
-    label: 'Finanzas',
-    icon: '💰',
-    type: 'group',
-    children: [
-      { id: 'expenses', label: 'Gastos', icon: '💸', entity: 'expenses' },
-      { id: 'contributions', label: 'Aportaciones', icon: '🏦', entity: 'contributions' },
-      { id: 'sales', label: 'Ventas', icon: '💰', entity: 'sales' }
-    ]
-  },
-  {
-    id: 'cultivo',
-    label: 'Cultivo',
-    icon: '🌱',
-    type: 'group',
-    children: [
-      { id: 'lands', label: 'Terrenos', icon: '🗺️', entity: 'lands' },
-      { id: 'workers', label: 'Trabajadores', icon: '👤', entity: 'workers' },
-      { id: 'workLogs', label: 'Jornales', icon: '⏱️', entity: 'workLogs' },
-      { id: 'seeds', label: 'Semillas', icon: '🌰', entity: 'seeds' },
-      { id: 'agriculturalProducts', label: 'Abonos/Productos', icon: '🧪', entity: 'agriculturalProducts' },
-      { id: 'cropActivities', label: 'Labores', icon: '🚜', entity: 'cropActivities' },
-      { id: 'incidents', label: 'Incidencias', icon: '⚠️', entity: 'incidents' },
-      { id: 'harvests', label: 'Cosechas', icon: '🌾', entity: 'harvests' }
-    ]
-  },
-  {
-    id: 'journal',
-    label: 'Bitácora',
-    icon: '📋',
-    type: 'list',
-    entity: 'journal'
-  },
-  {
-    id: 'configuracion',
-    label: 'Configuración',
-    icon: '⚙️',
-    type: 'config'
-  },
-  {
-    id: 'mas',
-    label: 'Más',
-    icon: '⋯',
-    type: 'group',
-    children: [
-      { id: 'attachments', label: 'Archivos', icon: '📎', entity: 'attachments' },
-      { id: 'auditLogs', label: 'Auditoría', icon: '🧾', entity: 'auditLogs' },
-      { id: 'users', label: 'Usuarios', icon: '👥', entity: 'users' }
-    ]
+
+// Función para actualizar campos calculados
+window.updateCalculatedFields = function(entity, form) {
+  var config = window.ENTITY_CONFIG[entity];
+  if (!config || !config.fields) return;
+
+  // Buscar campos que tienen calculatedFrom
+  config.fields.forEach(function(field) {
+    if (field.calculatedFrom && field.calculatedFrom.length > 0) {
+      var targetInput = form.querySelector('[name="' + field.name + '"]');
+      if (!targetInput) return;
+
+      // Obtener valores de los campos origen
+      var values = field.calculatedFrom.map(function(srcName) {
+        var input = form.querySelector('[name="' + srcName + '"]');
+        if (!input) return 0;
+        var val = parseFloat(input.value) || 0;
+        return val;
+      });
+
+      // Calcular el resultado (multiplicación)
+      var result = values.reduce(function(acc, val) { return acc * val; }, 1);
+
+      // Si es moneda, formatear con 2 decimales
+      var isMoney = field.name === 'amount' || field.name === 'total' || field.name === 'cost';
+      if (isMoney) {
+        targetInput.value = result.toFixed(2);
+      } else {
+        targetInput.value = result;
+      }
+    }
+  });
+};
+
+// Función para vincular eventos de cálculo automático
+window.bindAutoCalculations = function(entity, form) {
+  var config = window.ENTITY_CONFIG[entity];
+  if (!config || !config.fields) return;
+
+  // Encontrar todos los campos que tienen calculatedFrom
+  var calculatedFields = config.fields.filter(function(f) { return f.calculatedFrom && f.calculatedFrom.length > 0; });
+  if (calculatedFields.length === 0) return;
+
+  // Obtener todos los nombres de campos origen
+  var sourceFields = [];
+  calculatedFields.forEach(function(f) {
+    f.calculatedFrom.forEach(function(src) {
+      if (sourceFields.indexOf(src) === -1) sourceFields.push(src);
+    });
+  });
+
+  // Agregar event listeners a los campos origen
+  sourceFields.forEach(function(fieldName) {
+    var input = form.querySelector('[name="' + fieldName + '"]');
+    if (!input) return;
+
+    var update = function() {
+      window.updateCalculatedFields(entity, form);
+    };
+
+    input.addEventListener('input', update);
+    input.addEventListener('change', update);
+    input.addEventListener('keyup', update);
+  });
+
+  // Ejecutar cálculo inicial
+  window.updateCalculatedFields(entity, form);
+};
+
+// ================================================================
+// EXTENSIÓN DE showForm PARA INCLUIR CÁLCULOS AUTOMÁTICOS
+// ================================================================
+
+// Guardar referencia a showForm original
+var _originalShowForm = window.showForm;
+
+// Sobrescribir showForm para incluir cálculos automáticos
+window.showForm = function(entity, record) {
+  // Llamar a la función original
+  if (_originalShowForm) {
+    _originalShowForm(entity, record);
   }
-];
 
-// ================================================================
-// CONFIGURACIÓN DE ENTIDADES - FORMULARIOS COMPLETOS CON CÁLCULOS
-// ================================================================
-window.ENTITY_CONFIG = {
-
-  // ============================================================
-  // 1. SOCIOS (PARTNERS)
-  // ============================================================
-  partners: {
-    label: 'Socios',
-    singular: 'Socio',
-    icon: '👥',
-    listFields: ['name', 'email', 'phone', 'status', 'balance'],
-    fields: [
-      { name: 'name', label: 'Nombre completo', type: 'text', required: true },
-      { name: 'email', label: 'Correo electrónico', type: 'email', required: true },
-      { name: 'phone', label: 'Teléfono', type: 'tel' },
-      { name: 'documentType', label: 'Tipo de documento', type: 'select', options: ['CEDULA', 'PASAPORTE', 'RUC', 'NIT', 'OTRO'], defaultValue: 'CEDULA' },
-      { name: 'documentNumber', label: 'Número de documento', type: 'text' },
-      { name: 'address', label: 'Dirección', type: 'textarea' },
-      { name: 'status', label: 'Estado', type: 'select', options: ['ACTIVO', 'INACTIVO', 'PENDIENTE'], defaultValue: 'ACTIVO' },
-      { name: 'initialBalance', label: 'Saldo inicial', type: 'number', step: '0.01', min: 0, defaultValue: 0 },
-      { name: 'joinDate', label: 'Fecha de ingreso', type: 'date', required: true },
-      { name: 'notes', label: 'Notas', type: 'textarea' }
-    ],
-    fieldGroups: [
-      { title: '📋 Información personal', fields: ['name', 'email', 'phone', 'documentType', 'documentNumber'] },
-      { title: '📍 Dirección y estado', fields: ['address', 'status', 'joinDate'] },
-      { title: '💰 Saldo', fields: ['initialBalance'] },
-      { title: '📝 Notas', fields: ['notes'] }
-    ],
-    calculatedFields: ['balance']
-  },
-
-  // ============================================================
-  // 2. TERRENOS (LANDS)
-  // ============================================================
-  lands: {
-    label: 'Terrenos',
-    singular: 'Terreno',
-    icon: '🗺️',
-    listFields: ['name', 'location', 'area', 'status', 'rentalCost'],
-    fields: [
-      { name: 'name', label: 'Nombre del terreno', type: 'text', required: true },
-      { name: 'location', label: 'Ubicación', type: 'text', required: true },
-      { name: 'area', label: 'Área', type: 'number', step: '0.01', required: true, min: 0 },
-      { name: 'areaUnit', label: 'Unidad de área', type: 'select', options: ['ha', 'm²', 'acres'], defaultValue: 'ha' },
-      { name: 'owner', label: 'Propietario', type: 'text' },
-      { name: 'rentalStart', label: 'Inicio de alquiler', type: 'date' },
-      { name: 'rentalEnd', label: 'Fin de alquiler', type: 'date' },
-      { name: 'rentalCost', label: 'Coste de alquiler', type: 'number', step: '0.01', min: 0 },
-      { name: 'status', label: 'Estado', type: 'select', options: ['PLANIFICADO', 'ACTIVO', 'FINALIZADO'], defaultValue: 'PLANIFICADO' },
-      { name: 'notes', label: 'Notas', type: 'textarea' }
-    ],
-    fieldGroups: [
-      { title: '📍 Datos básicos', fields: ['name', 'location', 'area', 'areaUnit'] },
-      { title: '🏠 Propiedad', fields: ['owner', 'rentalStart', 'rentalEnd', 'rentalCost'] },
-      { title: '📊 Estado', fields: ['status'] },
-      { title: '📝 Notas', fields: ['notes'] }
-    ]
-  },
-
-  // ============================================================
-  // 3. GASTOS (EXPENSES) - CON ACTUALIZACIÓN DE SALDO
-  // ============================================================
-  expenses: {
-    label: 'Gastos',
-    singular: 'Gasto',
-    icon: '💸',
-    listFields: ['date', 'category', 'concept', 'amount', 'paymentMethod'],
-    fields: [
-      { name: 'date', label: 'Fecha del gasto', type: 'date', required: true },
-      { name: 'category', label: 'Categoría', type: 'select', required: true, options: ['TERRENO', 'SEMILLA', 'ABONO', 'PRODUCTOS', 'TRABAJADORES', 'HERRAMIENTAS', 'MAQUINARIA', 'TRANSPORTE', 'COMBUSTIBLE', 'RIEGO', 'ALIMENTACION', 'REPARACION', 'OTROS'] },
-      { name: 'concept', label: 'Concepto', type: 'text', required: true },
-      { name: 'provider', label: 'Proveedor', type: 'text' },
-      { name: 'amount', label: 'Importe', type: 'number', step: '0.01', required: true, min: 0 },
-      { name: 'paymentMethod', label: 'Método de pago', type: 'select', options: ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA', 'OTRO'] },
-      { name: 'landId', label: 'Terreno', type: 'select', optionsFrom: 'lands' },
-      { name: 'partnerId', label: 'Socio responsable', type: 'select', optionsFrom: 'partners' },
-      { name: 'notes', label: 'Notas', type: 'textarea' }
-    ],
-    fieldGroups: [
-      { title: '📋 Datos del gasto', fields: ['date', 'category', 'concept', 'amount'] },
-      { title: 'ℹ️ Información adicional', fields: ['provider', 'paymentMethod', 'landId', 'partnerId'] },
-      { title: '📝 Notas', fields: ['notes'] }
-    ],
-    transactionType: 'expense'
-  },
-
-  // ============================================================
-  // 4. APORTACIONES (CONTRIBUTIONS) - CON ACTUALIZACIÓN DE SALDO
-  // ============================================================
-  contributions: {
-    label: 'Aportaciones',
-    singular: 'Aportación',
-    icon: '🏦',
-    listFields: ['date', 'partnerName', 'amount', 'paymentMethod'],
-    fields: [
-      { name: 'date', label: 'Fecha de aportación', type: 'date', required: true },
-      { name: 'partnerId', label: 'Socio', type: 'select', optionsFrom: 'partners', required: true },
-      { name: 'amount', label: 'Importe', type: 'number', step: '0.01', required: true, min: 0 },
-      { name: 'paymentMethod', label: 'Método de pago', type: 'select', options: ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA', 'OTRO'] },
-      { name: 'concept', label: 'Concepto', type: 'text' },
-      { name: 'notes', label: 'Notas', type: 'textarea' }
-    ],
-    fieldGroups: [
-      { title: '📋 Datos de la aportación', fields: ['date', 'partnerId', 'amount'] },
-      { title: 'ℹ️ Información adicional', fields: ['paymentMethod', 'concept'] },
-      { title: '📝 Notas', fields: ['notes'] }
-    ],
-    transactionType: 'income'
-  },
-
-  // ============================================================
-  // 5. TRABAJADORES (WORKERS)
-  // ============================================================
-  workers: {
-    label: 'Trabajadores',
-    singular: 'Trabajador',
-    icon: '👤',
-    listFields: ['name', 'phone', 'type', 'rate', 'rateUnit'],
-    fields: [
-      { name: 'name', label: 'Nombre completo', type: 'text', required: true },
-      { name: 'phone', label: 'Teléfono', type: 'tel' },
-      { name: 'type', label: 'Tipo de trabajador', type: 'select', options: ['FIJO', 'TEMPORAL', 'CONTRATISTA'], defaultValue: 'TEMPORAL' },
-      { name: 'rate', label: 'Tarifa', type: 'number', step: '0.01', min: 0 },
-      { name: 'rateUnit', label: 'Unidad de tarifa', type: 'select', options: ['hora', 'día', 'mes', 'tarea'] },
-      { name: 'notes', label: 'Notas', type: 'textarea' }
-    ],
-    fieldGroups: [
-      { title: '👤 Datos personales', fields: ['name', 'phone'] },
-      { title: '💼 Información laboral', fields: ['type', 'rate', 'rateUnit'] },
-      { title: '📝 Notas', fields: ['notes'] }
-    ]
-  },
-
-  // ============================================================
-  // 6. JORNALES (WORKLOGS) - CON ACTUALIZACIÓN DE SALDO
-  // ============================================================
-  workLogs: {
-    label: 'Jornales',
-    singular: 'Jornal',
-    icon: '⏱️',
-    listFields: ['date', 'workerName', 'activity', 'hours', 'amount'],
-    fields: [
-      { name: 'date', label: 'Fecha', type: 'date', required: true },
-      { name: 'workerId', label: 'Trabajador', type: 'select', optionsFrom: 'workers', required: true },
-      { name: 'landId', label: 'Terreno', type: 'select', optionsFrom: 'lands' },
-      { name: 'activity', label: 'Actividad realizada', type: 'text', required: true },
-      { name: 'hours', label: 'Horas trabajadas', type: 'number', step: '0.1', min: 0 },
-      { name: 'days', label: 'Días trabajados', type: 'number', step: '0.1', min: 0 },
-      { name: 'rate', label: 'Tarifa aplicada', type: 'number', step: '0.01', min: 0 },
-      { name: 'amount', label: 'Importe total', type: 'number', step: '0.01', required: true, min: 0, calculatedFrom: ['hours', 'rate'], readOnly: true },
-      { name: 'paid', label: 'Pagado', type: 'checkbox' }
-    ],
-    fieldGroups: [
-      { title: '📋 Datos del jornal', fields: ['date', 'workerId', 'landId', 'activity'] },
-      { title: '🧮 Cálculo', fields: ['hours', 'days', 'rate', 'amount'] },
-      { title: '💰 Estado de pago', fields: ['paid'] }
-    ],
-    transactionType: 'expense'
-  },
-
-  // ============================================================
-  // 7. SEMILLAS (SEEDS) - CON ACTUALIZACIÓN DE SALDO
-  // ============================================================
-  seeds: {
-    label: 'Semillas',
-    singular: 'Semilla',
-    icon: '🌰',
-    listFields: ['date', 'variety', 'quantity', 'unit', 'total'],
-    fields: [
-      { name: 'date', label: 'Fecha', type: 'date', required: true },
-      { name: 'provider', label: 'Proveedor', type: 'text' },
-      { name: 'variety', label: 'Variedad', type: 'text', required: true },
-      { name: 'quantity', label: 'Cantidad', type: 'number', step: '0.01', required: true, min: 0 },
-      { name: 'unit', label: 'Unidad', type: 'select', options: ['kg', 'g', 'unidades'], defaultValue: 'kg' },
-      { name: 'price', label: 'Precio unitario', type: 'number', step: '0.01', min: 0 },
-      { name: 'total', label: 'Total', type: 'number', step: '0.01', required: true, min: 0, calculatedFrom: ['quantity', 'price'], readOnly: true },
-      { name: 'landId', label: 'Terreno', type: 'select', optionsFrom: 'lands' },
-      { name: 'partnerId', label: 'Socio responsable', type: 'select', optionsFrom: 'partners' },
-      { name: 'notes', label: 'Notas', type: 'textarea' }
-    ],
-    fieldGroups: [
-      { title: '📋 Datos de la semilla', fields: ['date', 'provider', 'variety'] },
-      { title: '📊 Cantidad y precio', fields: ['quantity', 'unit', 'price', 'total'] },
-      { title: '📍 Ubicación y responsable', fields: ['landId', 'partnerId'] },
-      { title: '📝 Notas', fields: ['notes'] }
-    ],
-    transactionType: 'expense'
-  },
-
-  // ============================================================
-  // 8. ABONOS / PRODUCTOS (AGRICULTURAL PRODUCTS) - CON ACTUALIZACIÓN DE SALDO
-  // ============================================================
-  agriculturalProducts: {
-    label: 'Abonos/Productos',
-    singular: 'Producto',
-    icon: '🧪',
-    listFields: ['date', 'product', 'type', 'quantity', 'total'],
-    fields: [
-      { name: 'date', label: 'Fecha', type: 'date', required: true },
-      { name: 'product', label: 'Nombre del producto', type: 'text', required: true },
-      { name: 'type', label: 'Tipo de producto', type: 'select', options: ['ABONO', 'FERTILIZANTE', 'HERBICIDA', 'INSECTICIDA', 'FUNGICIDA', 'OTRO'] },
-      { name: 'quantity', label: 'Cantidad', type: 'number', step: '0.01', required: true, min: 0 },
-      { name: 'unit', label: 'Unidad', type: 'select', options: ['kg', 'L', 'unidades'], defaultValue: 'kg' },
-      { name: 'price', label: 'Precio unitario', type: 'number', step: '0.01', min: 0 },
-      { name: 'total', label: 'Total', type: 'number', step: '0.01', required: true, min: 0, calculatedFrom: ['quantity', 'price'], readOnly: true },
-      { name: 'provider', label: 'Proveedor', type: 'text' },
-      { name: 'landId', label: 'Terreno', type: 'select', optionsFrom: 'lands' },
-      { name: 'partnerId', label: 'Socio responsable', type: 'select', optionsFrom: 'partners' },
-      { name: 'applicationReason', label: 'Motivo de aplicación', type: 'text' },
-      { name: 'dose', label: 'Dosis', type: 'text' },
-      { name: 'notes', label: 'Notas', type: 'textarea' }
-    ],
-    fieldGroups: [
-      { title: '📋 Datos del producto', fields: ['date', 'product', 'type'] },
-      { title: '📊 Cantidad y precio', fields: ['quantity', 'unit', 'price', 'total'] },
-      { title: '🧪 Aplicación', fields: ['provider', 'landId', 'partnerId', 'applicationReason', 'dose'] },
-      { title: '📝 Notas', fields: ['notes'] }
-    ],
-    transactionType: 'expense'
-  },
-
-  // ============================================================
-  // 9. LABORES (CROP ACTIVITIES)
-  // ============================================================
-  cropActivities: {
-    label: 'Labores',
-    singular: 'Labor',
-    icon: '🚜',
-    listFields: ['date', 'activity', 'landName', 'responsible', 'cost'],
-    fields: [
-      { name: 'date', label: 'Fecha', type: 'date', required: true },
-      { name: 'landId', label: 'Terreno', type: 'select', optionsFrom: 'lands', required: true },
-      { name: 'activity', label: 'Actividad realizada', type: 'text', required: true },
-      { name: 'responsible', label: 'Responsable', type: 'text' },
-      { name: 'workers', label: 'Trabajadores', type: 'text' },
-      { name: 'duration', label: 'Duración (horas)', type: 'number', step: '0.1', min: 0 },
-      { name: 'materials', label: 'Materiales', type: 'text' },
-      { name: 'cost', label: 'Coste', type: 'number', step: '0.01', min: 0 },
-      { name: 'notes', label: 'Notas', type: 'textarea' }
-    ],
-    fieldGroups: [
-      { title: '📋 Datos de la labor', fields: ['date', 'landId', 'activity'] },
-      { title: '👥 Recursos', fields: ['responsible', 'workers', 'duration', 'materials'] },
-      { title: '💰 Coste', fields: ['cost'] },
-      { title: '📝 Notas', fields: ['notes'] }
-    ],
-    transactionType: 'expense'
-  },
-
-  // ============================================================
-  // 10. INCIDENCIAS (INCIDENTS)
-  // ============================================================
-  incidents: {
-    label: 'Incidencias',
-    singular: 'Incidencia',
-    icon: '⚠️',
-    listFields: ['date', 'type', 'severity', 'status', 'description'],
-    fields: [
-      { name: 'date', label: 'Fecha', type: 'date', required: true },
-      { name: 'landId', label: 'Terreno', type: 'select', optionsFrom: 'lands' },
-      { name: 'type', label: 'Tipo de incidencia', type: 'select', options: ['PLAGA', 'ENFERMEDAD', 'CLIMA', 'RIEGO', 'MAQUINARIA', 'OTRO'] },
-      { name: 'severity', label: 'Severidad', type: 'select', options: ['BAJA', 'MEDIA', 'ALTA'] },
-      { name: 'description', label: 'Descripción', type: 'textarea', required: true },
-      { name: 'action', label: 'Acción tomada', type: 'textarea' },
-      { name: 'cost', label: 'Coste', type: 'number', step: '0.01', min: 0 },
-      { name: 'responsible', label: 'Responsable', type: 'text' },
-      { name: 'status', label: 'Estado', type: 'select', options: ['OPEN', 'IN_PROGRESS', 'RESOLVED'], defaultValue: 'OPEN' },
-      { name: 'notes', label: 'Notas', type: 'textarea' }
-    ],
-    fieldGroups: [
-      { title: '📋 Datos de la incidencia', fields: ['date', 'landId', 'type', 'severity'] },
-      { title: '📝 Descripción y acción', fields: ['description', 'action'] },
-      { title: '👤 Gestión', fields: ['cost', 'responsible', 'status'] },
-      { title: '📝 Notas', fields: ['notes'] }
-    ],
-    transactionType: 'expense'
-  },
-
-  // ============================================================
-  // 11. COSECHAS (HARVESTS)
-  // ============================================================
-  harvests: {
-    label: 'Cosechas',
-    singular: 'Cosecha',
-    icon: '🌾',
-    listFields: ['date', 'landName', 'quantity', 'unit', 'quality'],
-    fields: [
-      { name: 'date', label: 'Fecha de cosecha', type: 'date', required: true },
-      { name: 'landId', label: 'Terreno', type: 'select', optionsFrom: 'lands', required: true },
-      { name: 'quantity', label: 'Cantidad cosechada', type: 'number', step: '0.01', required: true, min: 0 },
-      { name: 'unit', label: 'Unidad', type: 'select', options: ['kg', 't', 'unidades'], defaultValue: 'kg' },
-      { name: 'quality', label: 'Calidad', type: 'select', options: ['ALTA', 'MEDIA', 'BAJA'] },
-      { name: 'destination', label: 'Destino', type: 'text' },
-      { name: 'estimatedValue', label: 'Valor estimado', type: 'number', step: '0.01', min: 0 },
-      { name: 'notes', label: 'Notas', type: 'textarea' }
-    ],
-    fieldGroups: [
-      { title: '📋 Datos de la cosecha', fields: ['date', 'landId', 'quantity', 'unit'] },
-      { title: '⭐ Calidad y destino', fields: ['quality', 'destination', 'estimatedValue'] },
-      { title: '📝 Notas', fields: ['notes'] }
-    ],
-    transactionType: 'income'
-  },
-
-  // ============================================================
-  // 12. VENTAS (SALES) - CON ACTUALIZACIÓN DE SALDO
-  // ============================================================
-  sales: {
-    label: 'Ventas',
-    singular: 'Venta',
-    icon: '💰',
-    listFields: ['date', 'customer', 'quantity', 'total', 'paymentStatus'],
-    fields: [
-      { name: 'date', label: 'Fecha de venta', type: 'date', required: true },
-      { name: 'customer', label: 'Cliente', type: 'text', required: true },
-      { name: 'quantity', label: 'Cantidad (kg)', type: 'number', step: '0.01', required: true, min: 0 },
-      { name: 'price', label: 'Precio por kg', type: 'number', step: '0.01', min: 0 },
-      { name: 'total', label: 'Total', type: 'number', step: '0.01', required: true, min: 0, calculatedFrom: ['quantity', 'price'], readOnly: true },
-      { name: 'paymentMethod', label: 'Método de pago', type: 'select', options: ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA', 'OTRO'] },
-      { name: 'paymentStatus', label: 'Estado de pago', type: 'select', options: ['COBRADO', 'PENDIENTE', 'PARCIAL'] },
-      { name: 'landId', label: 'Terreno', type: 'select', optionsFrom: 'lands' },
-      { name: 'partnerId', label: 'Socio responsable', type: 'select', optionsFrom: 'partners' },
-      { name: 'notes', label: 'Notas', type: 'textarea' }
-    ],
-    fieldGroups: [
-      { title: '📋 Datos de la venta', fields: ['date', 'customer', 'quantity', 'price', 'total'] },
-      { title: '💳 Pago', fields: ['paymentMethod', 'paymentStatus'] },
-      { title: '📍 Ubicación y responsable', fields: ['landId', 'partnerId'] },
-      { title: '📝 Notas', fields: ['notes'] }
-    ],
-    transactionType: 'income'
-  },
-
-  // ============================================================
-  // 13. BITÁCORA (JOURNAL)
-  // ============================================================
-  journal: {
-    label: 'Bitácora',
-    singular: 'Nota',
-    icon: '📋',
-    listFields: ['date', 'title', 'content'],
-    fields: [
-      { name: 'date', label: 'Fecha', type: 'date', required: true },
-      { name: 'title', label: 'Título', type: 'text', required: true },
-      { name: 'content', label: 'Contenido', type: 'textarea', required: true, rows: 5 },
-      { name: 'notes', label: 'Notas adicionales', type: 'textarea' }
-    ],
-    fieldGroups: [
-      { title: '📋 Información', fields: ['date', 'title'] },
-      { title: '📝 Contenido', fields: ['content'] },
-      { title: '📝 Notas', fields: ['notes'] }
-    ]
-  },
-
-  // ============================================================
-  // 14. USUARIOS (USERS)
-  // ============================================================
-  users: {
-    label: 'Usuarios',
-    singular: 'Usuario',
-    icon: '👥',
-    listFields: ['name', 'email', 'role', 'active'],
-    fields: [
-      { name: 'name', label: 'Nombre', type: 'text', required: true },
-      { name: 'email', label: 'Email', type: 'email', required: true },
-      { name: 'role', label: 'Rol', type: 'select', options: ['SOCIO', 'ADMIN'], defaultValue: 'SOCIO' },
-      { name: 'active', label: 'Activo', type: 'checkbox' }
-    ],
-    fieldGroups: [
-      { title: '👤 Datos del usuario', fields: ['name', 'email'] },
-      { title: '🔐 Permisos', fields: ['role', 'active'] }
-    ]
-  },
-
-  // ============================================================
-  // 15. ARCHIVOS (ATTACHMENTS)
-  // ============================================================
-  attachments: {
-    label: 'Archivos',
-    singular: 'Archivo',
-    icon: '📎',
-    listFields: ['fileName', 'uploadedAt', 'uploadedBy'],
-    fields: []
-  },
-
-  // ============================================================
-  // 16. AUDITORÍA (AUDIT LOGS)
-  // ============================================================
-  auditLogs: {
-    label: 'Auditoría',
-    singular: 'Registro',
-    icon: '🧾',
-    listFields: ['timestamp', 'userName', 'action', 'entity', 'description'],
-    fields: []
-  },
-
-  // ============================================================
-  // 17. CONFIGURACIÓN (APP SETTINGS)
-  // ============================================================
-  appSettings: {
-    label: 'Configuración',
-    singular: 'Configuración',
-    icon: '⚙️',
-    listFields: ['key', 'value', 'description'],
-    fields: [
-      { name: 'key', label: 'Clave', type: 'text', required: true },
-      { name: 'value', label: 'Valor', type: 'text', required: true },
-      { name: 'description', label: 'Descripción', type: 'textarea' }
-    ],
-    fieldGroups: [
-      { title: '⚙️ Configuración', fields: ['key', 'value'] },
-      { title: '📝 Descripción', fields: ['description'] }
-    ]
-  }
+  // Esperar a que el DOM se actualice y vincular cálculos automáticos
+  setTimeout(function() {
+    var form = document.getElementById('entity-form');
+    if (form) {
+      window.bindAutoCalculations(entity, form);
+    }
+  }, 50);
 };
 
-window.DEFAULT_SETTINGS = {
-  currency: 'USD',
-  currencySymbol: '$',
-  companyName: 'Malanga Agrícola',
-  companyEmail: 'info@malanga.com',
-  companyPhone: '+1 123 456 7890',
-  taxRate: 0,
-  defaultProject: 'malanga-2026'
+// ================================================================
+// EXTENSIÓN DE handleFormSubmit PARA INCLUIR CÁLCULOS
+// ================================================================
+
+// Guardar referencia a handleFormSubmit original
+var _originalHandleFormSubmit = window.handleFormSubmit;
+
+// Sobrescribir handleFormSubmit
+window.handleFormSubmit = function(entity, record) {
+  // Actualizar cálculos antes de enviar
+  var form = document.getElementById('entity-form');
+  if (form) {
+    window.updateCalculatedFields(entity, form);
+  }
+
+  // Llamar a la función original
+  if (_originalHandleFormSubmit) {
+    _originalHandleFormSubmit(entity, record);
+  }
 };

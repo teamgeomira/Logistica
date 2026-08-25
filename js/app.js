@@ -874,8 +874,73 @@ async function resetConfig() {
 }
 
 // ================================================================
-// FORMULARIOS
+// FORMULARIOS CON CÁLCULOS AUTOMÁTICOS
 // ================================================================
+
+// Función para actualizar campos calculados en tiempo real
+window.updateCalculatedFields = function(entity, form) {
+  var config = window.ENTITY_CONFIG[entity];
+  if (!config || !config.fields) return;
+
+  config.fields.forEach(function(field) {
+    if (field.calculatedFrom && field.calculatedFrom.length > 0) {
+      var targetInput = form.querySelector('[name="' + field.name + '"]');
+      if (!targetInput) return;
+
+      // Obtener valores de los campos origen
+      var values = field.calculatedFrom.map(function(srcName) {
+        var input = form.querySelector('[name="' + srcName + '"]');
+        if (!input) return 0;
+        var val = parseFloat(input.value) || 0;
+        return val;
+      });
+
+      // Calcular el resultado (multiplicación)
+      var result = values.reduce(function(acc, val) { return acc * val; }, 1);
+
+      // Si es moneda, formatear con 2 decimales
+      var isMoney = field.name === 'amount' || field.name === 'total' || field.name === 'cost';
+      if (isMoney) {
+        targetInput.value = result.toFixed(2);
+      } else {
+        targetInput.value = result;
+      }
+    }
+  });
+};
+
+// Función para vincular eventos de cálculo automático
+window.bindAutoCalculations = function(entity, form) {
+  var config = window.ENTITY_CONFIG[entity];
+  if (!config || !config.fields) return;
+
+  var calculatedFields = config.fields.filter(function(f) { return f.calculatedFrom && f.calculatedFrom.length > 0; });
+  if (calculatedFields.length === 0) return;
+
+  var sourceFields = [];
+  calculatedFields.forEach(function(f) {
+    f.calculatedFrom.forEach(function(src) {
+      if (sourceFields.indexOf(src) === -1) sourceFields.push(src);
+    });
+  });
+
+  sourceFields.forEach(function(fieldName) {
+    var input = form.querySelector('[name="' + fieldName + '"]');
+    if (!input) return;
+
+    var update = function() {
+      window.updateCalculatedFields(entity, form);
+    };
+
+    input.addEventListener('input', update);
+    input.addEventListener('change', update);
+    input.addEventListener('keyup', update);
+  });
+
+  // Ejecutar cálculo inicial
+  window.updateCalculatedFields(entity, form);
+};
+
 function showForm(entity, record) {
   record = record || null;
   var config = window.ENTITY_CONFIG[entity];
@@ -906,12 +971,23 @@ function showForm(entity, record) {
   `;
 
   modal.classList.remove('hidden');
-  modal.querySelector('#entity-form').addEventListener('submit', function(e) {
+  
+  var form = modal.querySelector('#entity-form');
+  
+  form.addEventListener('submit', function(e) {
     e.preventDefault();
+    // Actualizar cálculos antes de enviar
+    window.updateCalculatedFields(entity, form);
     handleFormSubmit(entity, record);
   });
+  
   modal.querySelector('[data-dismiss]').addEventListener('click', closeModal);
   modal.querySelector('.modal-close').addEventListener('click', closeModal);
+  
+  // Vincular cálculos automáticos después de mostrar el formulario
+  setTimeout(function() {
+    window.bindAutoCalculations(entity, form);
+  }, 100);
 }
 
 function buildFormFields(entity, record) {
@@ -931,7 +1007,6 @@ function buildFormFields(entity, record) {
       var value = record[field.name] !== undefined ? record[field.name] : (field.defaultValue || '');
       if (field.type === 'date' && !value) value = window.todayISO();
 
-      // Para campos calculados, agregar atributo data-calc-from y clase
       var calcAttr = field.calculatedFrom ? ' data-calc-from="' + field.calculatedFrom.join(',') + '"' : '';
       var readOnlyAttr = field.readOnly ? ' readonly' : '';
 
@@ -992,28 +1067,13 @@ function getOptions(field) {
   return [];
 }
 
-// Función para calcular campos derivados
-function calculateDerivedFields(entity, data) {
-  var config = window.ENTITY_CONFIG[entity];
-  if (!config || !config.fields) return data;
-
-  config.fields.forEach(function(field) {
-    if (field.calculatedFrom && field.calculatedFrom.length > 0) {
-      var operands = field.calculatedFrom.map(function(srcName) {
-        return Number(data[srcName]) || 0;
-      });
-      // Para multiplicación, usamos reduce
-      var result = operands.reduce(function(acc, val) { return acc * val; }, 1);
-      data[field.name] = result;
-    }
-  });
-
-  return data;
-}
-
 async function handleFormSubmit(entity, record) {
   var config = window.ENTITY_CONFIG[entity];
   var form = document.getElementById('entity-form');
+  
+  // Actualizar cálculos automáticos antes de recopilar datos
+  window.updateCalculatedFields(entity, form);
+  
   var formData = new FormData(form);
   var data = {};
 
@@ -1030,9 +1090,6 @@ async function handleFormSubmit(entity, record) {
     }
     data[field.name] = value;
   });
-
-  // Calcular automáticamente campos derivados
-  data = calculateDerivedFields(entity, data);
 
   data.projectId = data.projectId || window.APP_CONFIG.defaultProjectId;
 
