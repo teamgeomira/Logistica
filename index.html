@@ -7,7 +7,7 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#2d6a4f">
   <meta name="description" content="Sistema de gestión colaborativa para proyectos agrícolas">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   
@@ -305,7 +305,7 @@
     }
 
     #login-screen::after {
-      content: '🌿';
+      content: '🌱';
       position: absolute;
       font-size: 6rem;
       opacity: 0.06;
@@ -1526,7 +1526,7 @@
           <input type="email" id="login-email" name="email" placeholder="socio@email.com" required autocomplete="email" autocapitalize="off" spellcheck="false" inputmode="email">
         </div>
         <div class="form-group">
-          <label for="login-password"><span class="label-icon">🔒</span> Contraseña</label>
+          <label for="login-password"><span class="label-icon">🔐</span> Contraseña</label>
           <input type="password" id="login-password" name="password" placeholder="••••••••" required autocomplete="current-password" minlength="6">
         </div>
         <button type="submit" id="login-btn" class="btn btn-login">
@@ -1538,7 +1538,7 @@
       <div id="login-error" class="error-message" role="alert" aria-live="polite"></div>
 
       <div class="login-footer">
-        <span class="version">v2.0.0</span>
+        <span class="version">v2.1.0</span>
         <span>·</span>
         <span>© 2026 Malanga</span>
       </div>
@@ -1601,22 +1601,40 @@
   </div>
 
   <!-- ================================================================ -->
-  <!-- SCRIPTS                                                          -->
+  <!-- SCRIPTS - ORDEN CORRECTO                                         -->
   <!-- ================================================================ -->
+  
+  <!-- 1. Firebase CDN (SIEMPRE PRIMERO) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.1/firebase-database-compat.js"></script>
 
-  <script src="./js/config.js"></script>
-  <script src="./js/firebase.js"></script>
-  <script src="./js/auth.js"></script>
-  <script src="./js/database.js"></script>
-  <script src="./js/utils.js"></script>
-  <script src="./js/app.js"></script>
+  <!-- 2. CONFIGURACIÓN (SEGUNDO) -->
+  <script src="./js/config.js?v=2"></script>
 
+  <!-- 3. INICIALIZACIÓN DE FIREBASE (TERCERO) -->
+  <script src="./js/firebase.js?v=2"></script>
+
+  <!-- 4. AUTENTICACIÓN (CUARTO) -->
+  <script src="./js/auth.js?v=2"></script>
+
+  <!-- 5. BASE DE DATOS (QUINTO) -->
+  <script src="./js/database.js?v=2"></script>
+
+  <!-- 6. UTILIDADES (SEXTO) -->
+  <script src="./js/utils.js?v=2"></script>
+
+  <!-- 7. APLICACIÓN PRINCIPAL (SÉPTIMO - ÚLTIMO) -->
+  <script src="./js/app.js?v=2"></script>
+
+  <!-- ================================================================ -->
+  <!-- SERVICE WORKER Y LOG                                            -->
+  <!-- ================================================================ -->
   <script>
     (function() {
       'use strict';
+      
+      // Registrar Service Worker
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {
           navigator.serviceWorker.register('./service-worker.js')
@@ -1628,10 +1646,25 @@
             });
         });
       }
+      
+      // Detectar modo PWA
       if (window.matchMedia('(display-mode: standalone)').matches) {
         document.documentElement.classList.add('pwa-mode');
+        console.log('📱 Modo PWA detectado');
       }
-      console.log('🌱 Malanga v2.0.0 - Aplicación cargada');
+      
+      // Verificar que los scripts se cargaron correctamente
+      setTimeout(function() {
+        console.log('🌱 Malanga v2.1.0 - Aplicación cargada');
+        console.log('📦 Estado de carga:');
+        console.log('  - Firebase:', typeof firebase !== 'undefined' ? '✅ Cargado' : '❌ No cargado');
+        console.log('  - Config:', typeof window.FIREBASE_CONFIG !== 'undefined' ? '✅ Cargado' : '❌ No cargado');
+        console.log('  - Auth:', typeof window.auth !== 'undefined' ? '✅ Cargado' : '❌ No cargado');
+        console.log('  - Database:', typeof window.db !== 'undefined' ? '✅ Cargado' : '❌ No cargado');
+        console.log('  - Utils:', typeof window.formatMoney !== 'undefined' ? '✅ Cargado' : '❌ No cargado');
+        console.log('  - App:', typeof window.showForm !== 'undefined' ? '✅ Cargado' : '❌ No cargado');
+      }, 1000);
+      
     })();
   </script>
 </body>
