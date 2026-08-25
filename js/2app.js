@@ -1,7 +1,10 @@
 // ================================================================
-// APLICACIÓN PRINCIPAL - MALANGA v2.1.0
+// APLICACIÓN PRINCIPAL - MALANGA v2.0.0
 // ================================================================
 
+// ================================================================
+// ESTADO GLOBAL
+// ================================================================
 const state = {
   currentUser: null,
   userProfile: null,
@@ -319,6 +322,7 @@ function renderCurrentView() {
   if (!main) return;
 
   var section = null;
+  var isChild = false;
 
   // Buscar en la navegación
   for (var i = 0; i < window.NAV_SECTIONS.length; i++) {
@@ -331,6 +335,7 @@ function renderCurrentView() {
       for (var j = 0; j < navSection.children.length; j++) {
         if (navSection.children[j].id === state.currentSection) {
           section = navSection.children[j];
+          isChild = true;
           break;
         }
       }
@@ -366,24 +371,15 @@ function renderCurrentView() {
 }
 
 // ================================================================
-// DASHBOARD MEJORADO
+// DASHBOARD
 // ================================================================
 function renderDashboard() {
-  // Calcular totales
   var expenses = sumEntity('expenses', 'amount');
   var contributions = sumEntity('contributions', 'amount');
   var sales = sumEntity('sales', 'total');
-  var seedsTotal = sumEntity('seeds', 'total');
-  var productsTotal = sumEntity('agriculturalProducts', 'total');
-  var workLogsTotal = sumEntity('workLogs', 'amount');
-  var activitiesCost = sumEntity('cropActivities', 'cost');
-  var incidentsCost = sumEntity('incidents', 'cost');
   var harvestKg = sumEntity('harvests', 'quantity');
   var salesKg = sumEntity('sales', 'quantity');
-  
-  var totalExpenses = expenses + seedsTotal + productsTotal + workLogsTotal + activitiesCost + incidentsCost;
-  var totalIncome = contributions + sales;
-  var resultado = totalIncome - totalExpenses;
+  var resultado = contributions + sales - expenses;
   var totalPartners = Object.values(state.data.partners || {}).filter(function(p) { return !p.deleted && p.status === 'ACTIVO'; }).length;
 
   var alerts = computeAlerts();
@@ -406,12 +402,12 @@ function renderDashboard() {
           <div class="stat-value">${window.formatMoney(contributions)}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label"><span class="label-icon">💸</span> Gastos totales</div>
-          <div class="stat-value">${window.formatMoney(totalExpenses)}</div>
+          <div class="stat-label"><span class="label-icon">💸</span> Gastos</div>
+          <div class="stat-value">${window.formatMoney(expenses)}</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label"><span class="label-icon">💰</span> Ingresos totales</div>
-          <div class="stat-value">${window.formatMoney(totalIncome)}</div>
+          <div class="stat-label"><span class="label-icon">💰</span> Ingresos</div>
+          <div class="stat-value">${window.formatMoney(sales)}</div>
         </div>
         <div class="stat-card">
           <div class="stat-label"><span class="label-icon">📊</span> Resultado</div>
@@ -931,19 +927,15 @@ function buildFormFields(entity, record) {
       var value = record[field.name] !== undefined ? record[field.name] : (field.defaultValue || '');
       if (field.type === 'date' && !value) value = window.todayISO();
 
-      // Para campos calculados, agregar atributo data-calc-from y clase
-      var calcAttr = field.calculatedFrom ? ' data-calc-from="' + field.calculatedFrom.join(',') + '"' : '';
-      var readOnlyAttr = field.readOnly ? ' readonly' : '';
-
       html += '<div class="form-group">';
       html += '<label for="f_' + field.name + '">' + field.label + (field.required ? ' <span class="required">*</span>' : '') + '</label>';
 
       switch (field.type) {
         case 'textarea':
-          html += '<textarea id="f_' + field.name + '" name="' + field.name + '" ' + (field.required ? 'required' : '') + ' rows="' + (field.rows || 3) + '" placeholder="' + (field.placeholder || '') + '"' + calcAttr + '>' + window.escapeHtml(value) + '</textarea>';
+          html += '<textarea id="f_' + field.name + '" name="' + field.name + '" ' + (field.required ? 'required' : '') + ' rows="' + (field.rows || 3) + '" placeholder="' + (field.placeholder || '') + '">' + window.escapeHtml(value) + '</textarea>';
           break;
         case 'select':
-          html += '<select id="f_' + field.name + '" name="' + field.name + '" ' + (field.required ? 'required' : '') + calcAttr + '>';
+          html += '<select id="f_' + field.name + '" name="' + field.name + '" ' + (field.required ? 'required' : '') + '>';
           if (!field.required) html += '<option value="">— Seleccionar —</option>';
           var options = getOptions(field);
           options.forEach(function(opt) {
@@ -954,13 +946,13 @@ function buildFormFields(entity, record) {
           break;
         case 'checkbox':
           var checked = value ? 'checked' : '';
-          html += '<input type="checkbox" id="f_' + field.name + '" name="' + field.name + '" ' + checked + calcAttr + '>';
+          html += '<input type="checkbox" id="f_' + field.name + '" name="' + field.name + '" ' + checked + '>';
           break;
         case 'number':
-          html += '<input type="number" id="f_' + field.name + '" name="' + field.name + '" value="' + value + '" ' + (field.required ? 'required' : '') + ' ' + (field.step ? 'step="' + field.step + '"' : '') + ' ' + (field.min !== undefined ? 'min="' + field.min + '"' : '') + ' ' + (field.max !== undefined ? 'max="' + field.max + '"' : '') + ' placeholder="' + (field.placeholder || '') + '"' + calcAttr + readOnlyAttr + '>';
+          html += '<input type="number" id="f_' + field.name + '" name="' + field.name + '" value="' + value + '" ' + (field.required ? 'required' : '') + ' ' + (field.step ? 'step="' + field.step + '"' : '') + ' ' + (field.min !== undefined ? 'min="' + field.min + '"' : '') + ' ' + (field.max !== undefined ? 'max="' + field.max + '"' : '') + ' placeholder="' + (field.placeholder || '') + '">';
           break;
         default:
-          html += '<input type="' + field.type + '" id="f_' + field.name + '" name="' + field.name + '" value="' + window.escapeHtml(value) + '" ' + (field.required ? 'required' : '') + ' ' + (field.min !== undefined ? 'min="' + field.min + '"' : '') + ' ' + (field.max !== undefined ? 'max="' + field.max + '"' : '') + ' placeholder="' + (field.placeholder || '') + '"' + calcAttr + readOnlyAttr + '>';
+          html += '<input type="' + field.type + '" id="f_' + field.name + '" name="' + field.name + '" value="' + window.escapeHtml(value) + '" ' + (field.required ? 'required' : '') + ' ' + (field.min !== undefined ? 'min="' + field.min + '"' : '') + ' ' + (field.max !== undefined ? 'max="' + field.max + '"' : '') + ' placeholder="' + (field.placeholder || '') + '">';
       }
 
       html += '</div>';
@@ -992,25 +984,6 @@ function getOptions(field) {
   return [];
 }
 
-// Función para calcular campos derivados
-function calculateDerivedFields(entity, data) {
-  var config = window.ENTITY_CONFIG[entity];
-  if (!config || !config.fields) return data;
-
-  config.fields.forEach(function(field) {
-    if (field.calculatedFrom && field.calculatedFrom.length > 0) {
-      var operands = field.calculatedFrom.map(function(srcName) {
-        return Number(data[srcName]) || 0;
-      });
-      // Para multiplicación, usamos reduce
-      var result = operands.reduce(function(acc, val) { return acc * val; }, 1);
-      data[field.name] = result;
-    }
-  });
-
-  return data;
-}
-
 async function handleFormSubmit(entity, record) {
   var config = window.ENTITY_CONFIG[entity];
   var form = document.getElementById('entity-form');
@@ -1030,9 +1003,6 @@ async function handleFormSubmit(entity, record) {
     }
     data[field.name] = value;
   });
-
-  // Calcular automáticamente campos derivados
-  data = calculateDerivedFields(entity, data);
 
   data.projectId = data.projectId || window.APP_CONFIG.defaultProjectId;
 
@@ -1134,10 +1104,8 @@ function bindListSearch() {
 }
 
 function bindFormEvents() {
-  var saveConfigBtn = document.getElementById('save-config-btn');
-  if (saveConfigBtn) saveConfigBtn.addEventListener('click', saveConfig);
-  var resetConfigBtn = document.getElementById('reset-config-btn');
-  if (resetConfigBtn) resetConfigBtn.addEventListener('click', resetConfig);
+  document.getElementById('save-config-btn') && document.getElementById('save-config-btn').addEventListener('click', saveConfig);
+  document.getElementById('reset-config-btn') && document.getElementById('reset-config-btn').addEventListener('click', resetConfig);
 }
 
 function handleGlobalClick(e) {
@@ -1339,3 +1307,11 @@ document.addEventListener('click', function(e) {
     uploadAttachment(file);
   }
 });
+
+// ================================================================
+// FORMATO DE MONEDA
+// ================================================================
+window.formatMoney = function(amount) {
+  var symbol = state.settings.currencySymbol || window.APP_CONFIG.currencySymbol || '$';
+  return symbol + Number(amount || 0).toFixed(2);
+};

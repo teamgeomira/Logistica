@@ -1,7 +1,8 @@
-const CACHE_NAME = 'malanga-v1';
+const CACHE_NAME = 'malanga-v2';
 const urlsToCache = [
   './',
   './index.html',
+  './manifest.json',
   './js/config.js',
   './js/firebase.js',
   './js/auth.js',
@@ -13,29 +14,36 @@ const urlsToCache = [
   'https://www.gstatic.com/firebasejs/10.12.1/firebase-database-compat.js'
 ];
 
-self.addEventListener('install', (event) => {
+self.addEventListener('install', function(event) {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(urlsToCache))
+    caches.open(CACHE_NAME).then(function(cache) {
+      return cache.addAll(urlsToCache);
+    })
   );
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
+self.addEventListener('activate', function(event) {
   event.waitUntil(
-    caches.keys().then((cacheNames) =>
-      Promise.all(cacheNames.filter(name => name !== CACHE_NAME).map(name => caches.delete(name)))
-    )
+    caches.keys().then(function(cacheNames) {
+      return Promise.all(
+        cacheNames.filter(function(name) {
+          return name !== CACHE_NAME;
+        }).map(function(name) {
+          return caches.delete(name);
+        })
+      );
+    })
   );
   self.clients.claim();
 });
 
-self.addEventListener('fetch', (event) => {
+self.addEventListener('fetch', function(event) {
   if (event.request.method !== 'GET') return;
   event.respondWith(
-    caches.match(event.request).then((cached) => {
+    caches.match(event.request).then(function(cached) {
       if (cached) return cached;
-      return fetch(event.request).catch(() => {
-        // Si falla y no hay caché, mostrar página offline
+      return fetch(event.request).catch(function() {
         return caches.match('./index.html');
       });
     })

@@ -1,23 +1,32 @@
-// Utilidades globales - SIN IMPORTS/EXPORTS
-window.formatMoney = function(amount, currency = window.APP_CONFIG.currency) {
-  return new Intl.NumberFormat('es-ES', {
-    style: 'currency',
-    currency
-  }).format(Number(amount) || 0);
-};
+// ================================================================
+// FUNCIONES DE UTILIDAD
+// ================================================================
 
+// Formatear fecha
 window.formatDate = function(ts) {
   if (!ts) return '';
   const date = new Date(ts);
-  return date.toLocaleDateString('es-ES');
+  return date.toLocaleDateString('es-ES', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
 };
 
+// Formatear fecha y hora
 window.formatDateTime = function(ts) {
   if (!ts) return '';
   const date = new Date(ts);
-  return date.toLocaleString('es-ES');
+  return date.toLocaleString('es-ES', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 };
 
+// Escapar HTML para seguridad
 window.escapeHtml = function(str) {
   if (str === null || str === undefined) return '';
   return String(str)
@@ -28,20 +37,21 @@ window.escapeHtml = function(str) {
     .replace(/'/g, '&#039;');
 };
 
+// Obtener fecha de hoy en formato ISO
 window.todayISO = function() {
   return new Date().toISOString().split('T')[0];
 };
 
-window.debounce = function(fn, delay = 300) {
+// Debounce para evitar múltiples llamadas
+window.debounce = function(fn, delay) {
+  delay = delay || 300;
   let timer;
-  return (...args) => {
+  return function() {
+    var args = arguments;
+    var context = this;
     clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), delay);
+    timer = setTimeout(function() {
+      fn.apply(context, args);
+    }, delay);
   };
-};
-
-window.getUserName = function(userId) {
-  if (!state || !state.data || !state.data.users) return userId;
-  const user = state.data.users[userId];
-  return user ? (user.name || user.email || userId) : userId;
 };
